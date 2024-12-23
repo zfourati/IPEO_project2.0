@@ -345,17 +345,24 @@ batch_size = 2
 learning_rate = 0.1
 weight_decay = 0.001
 num_epochs = 10
-
+validation_split_ratio = 0.2
 
 
 # initialise data loaders
 dataset_train_2014 = GreenlandData(year=2014)
 dataset_train_2015 = GreenlandData(year=2015)
+dataset_train_2016 = GreenlandData(year=2016)
 # Combine the datasets
-combined_dataset = torch.utils.data.ConcatDataset([dataset_train_2014, dataset_train_2015])
-# Create DataLoader
-dl_train = DataLoader(combined_dataset, batch_size=batch_size,shuffle=True, num_workers=1)
-dl_val = DataLoader(GreenlandData(year=2016), batch_size=batch_size,shuffle=True, num_workers=1)
+combined_dataset = torch.utils.data.ConcatDataset([dataset_train_2014, dataset_train_2015,dataset_train_2016])
+validation_size = int(validation_split_ratio * len(combined_dataset))
+training_size = len(combined_dataset) - validation_size
+# Shuffle and split the dataset
+train_dataset, val_dataset = random_split(combined_dataset, [training_size, validation_size])
+
+# Create DataLoaders for training and validation
+dl_train = DataLoader(train_dataset, batch_size=32, shuffle=True)
+dl_val = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
 
 # load model
 model, epoch = load_model(epoch=start_epoch)
@@ -381,16 +388,3 @@ while epoch < num_epochs:
     epoch += 1
     save_model(model, epoch)
     
-with rasterio.open('data/images/train/2014/tile_159_2_2.tif') as src:
-        # Read the RGB bands (3, 2, 1)
-    rgb = np.dstack([src.read(3), src.read(2), src.read(1)])
-        # Normalize RGB for better visualization
-    rgb = rgb.astype(float)
-    #rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
-    plt.figure()
-    plt.imshow(rgb)
-
-with rasterio.open('data/labels/train/tile_159_2_2.tif') as lbl_src:
-    labels = lbl_src.read(1)
-    plt.figure()
-    plt.imshow(labels, cmap='tab20', vmin=0, vmax=len(label_names) - 1)

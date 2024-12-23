@@ -1,7 +1,13 @@
+"""
+Baseline Project
+We combine the datasets for the 3 years and split them into 80% training data and 20% validation.
+Model used: Hypercolumn
+"""
+
 import torch
 import rasterio
 from torch.utils.data import Dataset
-from torch.utils.data import DataLoader
+from torch.utils.data import ConcatDataset, random_split, DataLoader
 from PIL import Image
 import os
 import rasterio
@@ -161,7 +167,7 @@ class Hypercolumn(nn.Module):
             dim=1)
         return self.final(hypercol)
     
-from torch.utils.data import DataLoader
+
 batch_size=3
 dataset_train = GreenlandData(year=2014)
 dataloader_train = DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=1)
@@ -340,17 +346,30 @@ def save_model(model, epoch):
     
 # define hyperparameters
 device = 'cuda'
-start_epoch = 0        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
-batch_size = 2
+start_epoch = 'latest'        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
 num_epochs = 10
 
+validation_split_ratio = 0.2
 
 
 # initialise data loaders
-dl_train = DataLoader(GreenlandData(year=2014), batch_size=batch_size,shuffle=True, num_workers=1)
-dl_val = DataLoader(GreenlandData(year=2015), batch_size=batch_size,shuffle=True, num_workers=1)
+dataset_train_2014 = GreenlandData(year=2014)
+dataset_train_2015 = GreenlandData(year=2015)
+dataset_train_2016 = GreenlandData(year=2016)
+# Combine the datasets
+combined_dataset = torch.utils.data.ConcatDataset([dataset_train_2014, dataset_train_2015,dataset_train_2016])
+validation_size = int(validation_split_ratio * len(combined_dataset))
+training_size = len(combined_dataset) - validation_size
+# Shuffle and split the dataset
+train_dataset, val_dataset = random_split(combined_dataset, [training_size, validation_size])
+
+# Create DataLoaders for training and validation
+dl_train = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+dl_val = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+
 
 # load model
 model, epoch = load_model(epoch=start_epoch)
@@ -376,16 +395,8 @@ while epoch < num_epochs:
     epoch += 1
     save_model(model, epoch)
     
-with rasterio.open('data/images/train/2014/tile_159_2_2.tif') as src:
-        # Read the RGB bands (3, 2, 1)
-    rgb = np.dstack([src.read(3), src.read(2), src.read(1)])
-        # Normalize RGB for better visualization
-    rgb = rgb.astype(float)
-    #rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
-    plt.figure()
-    plt.imshow(rgb)
-
-with rasterio.open('data/labels/train/tile_159_2_2.tif') as lbl_src:
-    labels = lbl_src.read(1)
-    plt.figure()
-    plt.imshow(labels, cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+#Testing
+dataset_test = GreenlandData(year=2023)
+dl_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
+loss_test, oa_test = validate_epoch(dl_test, model, device)
+print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
