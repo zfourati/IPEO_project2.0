@@ -18,6 +18,7 @@ import rasterio
 import torch
 #matplotlib.use('Agg')
 #from glob import glob
+
 print(torch.cuda.is_available())
 LABEL_CLASSES = (
     "Bad data",

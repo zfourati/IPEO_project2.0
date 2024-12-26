@@ -14,6 +14,7 @@ import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
+from collections import Counter
 
 print(torch.cuda.is_available())
 seed = 323444           # the seed value used to initialise the random number generator of PyTorch
@@ -22,6 +23,9 @@ torch.cuda.manual_seed(seed)
 
 path_to_model = 'cnn_states/HypercolumnBaseline'
 os.makedirs(path_to_model, exist_ok=True)
+
+path_to_plot = 'Plots/Baseline'
+os.makedirs(path_to_plot, exist_ok=True)
 
 class GreenlandData(Dataset):
     LABEL_CLASSES = (
@@ -47,7 +51,7 @@ class GreenlandData(Dataset):
                 self.data.append((
                         imgName,
                         labelName,
-                        file_name
+                        file_name.replace(".tif", "")
                     ))
         else:
             files_list = sorted(os.listdir(f'data/images/train/{str(year)}'))
@@ -57,7 +61,7 @@ class GreenlandData(Dataset):
                 self.data.append((
                         imgName,
                         labelName,
-                        file_name
+                        file_name.replace(".tif", "")
                     ))
 
 
@@ -84,6 +88,39 @@ class GreenlandData(Dataset):
         with rasterio.open(labelName) as lbl_src:
             labels = lbl_src.read(1)  # Read the first band which contains the labels
         return rgb, labels, fileName
+
+class ReshapeDataLoader:
+    def __init__(self, dataloader):
+        """
+        A wrapper to reshape data from a PyTorch DataLoader.
+        Args:
+            dataloader (DataLoader): The original DataLoader.
+        """
+        self.dataloader = dataloader
+
+    def __iter__(self):
+        """
+        Iterate over the DataLoader and reshape the data.
+        """
+        for data, target, img_name in self.dataloader:
+            # Ensure data is float and properly reshaped
+            data = data.float()
+            if data.ndim == 4 and data.shape[-1] != data.shape[1]:
+                data = data.permute(0, 3, 1, 2)
+
+            # Ensure target is long and properly reshaped
+            target = target.long()
+            if target.ndim == 4 and target.shape[-1] != target.shape[1]:
+                target = target.permute(0, 3, 1, 2)
+
+            yield data, target, img_name
+
+    def __len__(self):
+        """
+        Return the length of the DataLoader.
+        """
+        return len(self.dataloader)
+
 
 
 dataset = GreenlandData()
@@ -173,21 +210,12 @@ class Hypercolumn(nn.Module):
 
 batch_size=3
 dataset_train = GreenlandData(year=2014)
-dataloader_train = DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=1)
+dataloader_train = ReshapeDataLoader(DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=2))
 model = Hypercolumn()
+data, _ , __= iter(dataloader_train).__next__()
 
-data, _ ,__= iter(dataloader_train).__next__()
-print("Original data shape:", data.shape)
-
-# Convert to float32 if needed
-data = data.float()
-
-# Ensure the shape is [batch_size, channels, height, width]
-if data.ndim == 4 and data.shape[-1] != data.shape[1]:  # Likely [batch_size, height, width, channels]
-    data = data.permute(0, 3, 1, 2)  # Rearrange to [batch_size, channels, height, width]
-
-print("Adjusted data shape:", data.shape)
 pred = model(data)
+
 
 assert pred.size(1) == len(dataset_train.LABEL_CLASSES), f'ERROR: invalid number of model output channels (should be # classes {len(dataset_train.LABEL_CLASSES)}, got {pred.size(1)})'
 assert pred.size(2) == data.size(2), f'ERROR: invalid spatial height of model output (should be {data.size(2)}, got {pred.size(2)})'
@@ -219,19 +247,8 @@ def train_epoch(data_loader, model, optimiser, device):
 
     # iterate over dataset
     pBar = trange(len(data_loader))
-    for idx, (data, target, img_name) in enumerate(data_loader):
+    for idx, (data, target, _) in enumerate(data_loader):
 
-        data = data.float()
-
-        # Ensure the shape is [batch_size, channels, height, width]
-        if data.ndim == 4 and data.shape[-1] != data.shape[1]:  # Likely [batch_size, height, width, channels]
-            data = data.permute(0, 3, 1, 2)  # Rearrange to [batch_size, channels, height, width]
-
-        target = target.long()
-
-        # Ensure the shape is [batch_size, channels, height, width]
-        if target.ndim == 4 and target.shape[-1] != target.shape[1]:  # Likely [batch_size, height, width, channels]
-            target = target.permute(0, 3, 1, 2)  # Rearrange to [batch_size, channels, height, width]
         # put data and target onto correct device
         data, target = data.to(device), target.to(device)
 
@@ -300,20 +317,8 @@ def validate_epoch(data_loader, model, device):       # note: no optimiser neede
 
     # iterate over dataset
     pBar = trange(len(data_loader))
-    for idx, (data, target, img_name) in enumerate(data_loader):
+    for idx, (data, target, _) in enumerate(data_loader):
         with torch.no_grad():
-
-        #TODO: likewise, implement the validation routine. This is very similar, but not identical, to the training steps.
-            data = data.float()
-
-        # Ensure the shape is [batch_size, channels, height, width]
-            if data.ndim == 4 and data.shape[-1] != data.shape[1]:  # Likely [batch_size, height, width, channels]
-                data = data.permute(0, 3, 1, 2)  # Rearrange to [batch_size, channels, height, width]\
-            target = target.long()
-
-            # Ensure the shape is [batch_size, channels, height, width]
-            if target.ndim == 4 and target.shape[-1] != target.shape[1]:  # Likely [batch_size, height, width, channels]
-                target = target.permute(0, 3, 1, 2)  # Rearrange to [batch_size, channels, height, width]
             # put data and target onto correct device
             data, target = data.to(device), target.to(device)
 
@@ -348,7 +353,7 @@ def save_model(model, epoch):
     
 # define hyperparameters
 device = 'cuda'
-start_epoch = 0        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 'latest'        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
@@ -369,8 +374,8 @@ training_size = len(combined_dataset) - validation_size
 train_dataset, val_dataset = random_split(combined_dataset, [training_size, validation_size])
 
 # Create DataLoaders for training and validation
-dl_train = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-dl_val = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+dl_train = ReshapeDataLoader(DataLoader(train_dataset, batch_size=batch_size, shuffle=True))
+dl_val = ReshapeDataLoader(DataLoader(val_dataset, batch_size=batch_size, shuffle=False))
 
 
 # load model
@@ -399,43 +404,43 @@ while epoch < num_epochs:
     
 #Testing
 dataset_test = GreenlandData(year=2023)
-dl_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
+dl_test = ReshapeDataLoader(DataLoader(dataset_test, batch_size=batch_size, shuffle=False))
 loss_test, oa_test = validate_epoch(dl_test, model, device)
 print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
+
+
 #Plot results
-def visualize(dataLoader, epochs = ['latest'], numImages=5):
-    models = [load_model(e)[0] for e in epochs]
-    numModels = len(models)
+def visualize(dataLoader, epoch = 'latest', numImages=5):
+    model, _ = load_model(epoch)
+    model = model.to(device)
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
 
-        _, ax = plt.subplots(nrows=1, ncols=numModels+1, figsize = (20, 15))
-
+        _, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
+  
+        labels = labels.to(device)
+        
         # plot ground truth
-        ax[0].imshow(labels[0,...].cpu().numpy())
+        ax[0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
         ax[0].axis('off')
-        if idx == 0:
-            ax[0].set_title('Ground Truth')
+        ax[0].set_title('Ground Truth')
 
-        for mIdx, model in enumerate(models):
-            model = model.to(device)
-            with torch.no_grad():
-                pred = model(data.to(device))
+        with torch.no_grad():
+            pred = model(data.to(device))
 
-                # get the label (i.e., the maximum position for each pixel along the class dimension)
-                yhat = torch.argmax(pred, dim=1)
+            # get the label (i.e., the maximum position for each pixel along the class dimension)
+            yhat = torch.argmax(pred, dim=1)
 
             # plot model predictions
-            ax[mIdx+1].imshow(yhat[0,...].cpu().numpy())
-            ax[mIdx+1].axis('off')
-            if idx == 0:
-                ax[mIdx+1].set_title(f'Epoch {epochs[mIdx]}')
-    plt.save('test_baseline.png')
-
-
+            ax[1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+            ax[1].axis('off')
+            ax[1].set_title(image_name[0])
+        plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
+        
 # visualize predictions for a number of epochs
 # load model states at different epochs
-epochs = [0, 1, 5, 'latest']                       
-visualize(dl_test, epochs)
+ 
+dl_test_single = ReshapeDataLoader(DataLoader(dataset_test, batch_size=1, shuffle=False))                  
+visualize(dl_test_single)
