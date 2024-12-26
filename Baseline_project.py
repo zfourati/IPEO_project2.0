@@ -411,6 +411,30 @@ print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
 
 #Plot results
+def plot_label_distribution(dataset, state = 'train'):
+    # Initialize a counter for label frequencies
+    label_counter = Counter()
+
+    # Iterate over the dataset
+    for _, labels, _ in dataset:
+        unique, counts = np.unique(labels, return_counts=True)
+        label_counter.update(dict(zip(unique, counts)))
+
+    # Map label indices to class names
+    class_names = label_names
+    class_counts = [label_counter.get(i, 0) for i in range(len(class_names))]
+    #print(sum(class_counts))
+    # Plot the distribution
+    plt.figure(figsize=(10, 6))
+    plt.bar(class_names, np.array(class_counts) / sum(class_counts), color='blue')
+    plt.xlabel('Label Classes')
+    plt.ylabel('Frequency')
+    plt.title(f'Label Distribution in {state} Dataset')
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Label_distribution_{state}.png')
+    plt.show()
+
 def visualize(dataLoader, epoch = 'latest', numImages=5):
     model, _ = load_model(epoch)
     model = model.to(device)
@@ -462,10 +486,13 @@ def visualize(dataLoader, epoch = 'latest', numImages=5):
     ax.set_xticks(x)
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
-    plt.savefig(f'{path_to_plot}/Label_distribution.png')
+    plt.savefig(f'{path_to_plot}/Label_distribution_test.png')
         
-# visualize predictions for a number of epochs
-# load model states at different epochs
- 
+#Visualize predictions and label class distribution
 dl_test_single = ReshapeDataLoader(DataLoader(dataset_test, batch_size=1, shuffle=False))                  
 visualize(dl_test_single)
+
+dl_train_single = ReshapeDataLoader(DataLoader(train_dataset, batch_size=1, shuffle=False))
+dl_val_single = ReshapeDataLoader(DataLoader(val_dataset, batch_size=1, shuffle=False))
+plot_label_distribution(dl_train_single)
+plot_label_distribution(dl_train_single, state = 'val')
