@@ -105,10 +105,10 @@ def plot_label_distribution(dataset):
     # Map label indices to class names
     class_names = LABEL_CLASSES
     class_counts = [label_counter.get(i, 0) for i in range(len(class_names))]
-
+    #print(sum(class_counts))
     # Plot the distribution
     plt.figure(figsize=(10, 6))
-    plt.bar(class_names, class_counts, color='skyblue')
+    plt.bar(class_names, np.array(class_counts) / sum(class_counts), color='skyblue')
     plt.xlabel('Label Classes')
     plt.ylabel('Frequency')
     plt.title('Label Distribution in Dataset')

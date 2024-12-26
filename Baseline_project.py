@@ -414,10 +414,14 @@ print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 def visualize(dataLoader, epoch = 'latest', numImages=5):
     model, _ = load_model(epoch)
     model = model.to(device)
+    label_counter = Counter()
+    pred_counter =  Counter()
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
-
+        unique_label, counts_label = np.unique(labels, return_counts=True)
+        label_counter.update(dict(zip(unique_label, counts_label)))
+        
         _, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
   
         labels = labels.to(device)
@@ -432,12 +436,33 @@ def visualize(dataLoader, epoch = 'latest', numImages=5):
 
             # get the label (i.e., the maximum position for each pixel along the class dimension)
             yhat = torch.argmax(pred, dim=1)
+            
+            unique_pred, counts_pred = np.unique(yhat.cpu().numpy(), return_counts=True)
+            pred_counter.update(dict(zip(unique_pred, counts_pred)))
 
             # plot model predictions
             ax[1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
             ax[1].axis('off')
             ax[1].set_title(image_name[0])
         plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
+    class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
+    class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
+    fig, ax = plt.subplots(figsize=(20, 8))
+    width = 0.35  # width of the bars
+    x = np.arange(len(label_names))  # the label positions
+
+    # Plot the bars for ground truth (blue) and predicted classes (green)
+    ax.bar(x - width / 2, np.array(class_counts_labels)/len(class_counts_labels), width, label='Ground Truth', color='blue', alpha=0.7)
+    ax.bar(x + width / 2, np.array(class_counts_pred)/len(class_counts_pred), width, label='Predicted', color='green', alpha=0.7)
+
+    # Set the labels and titles
+    ax.set_title('Class Frequency Comparison: Ground Truth vs. Predicted')
+    ax.set_xlabel('Class')
+    ax.set_ylabel('Frequency')
+    ax.set_xticks(x)
+    ax.set_xticklabels(label_names, rotation=45)
+    ax.legend()
+    plt.savefig(f'{path_to_plot}/Label_distribution.png')
         
 # visualize predictions for a number of epochs
 # load model states at different epochs
