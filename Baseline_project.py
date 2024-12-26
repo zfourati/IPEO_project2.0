@@ -452,8 +452,8 @@ def visualize(dataLoader, epoch = 'latest', numImages=5):
     x = np.arange(len(label_names))  # the label positions
 
     # Plot the bars for ground truth (blue) and predicted classes (green)
-    ax.bar(x - width / 2, np.array(class_counts_labels)/len(class_counts_labels), width, label='Ground Truth', color='blue', alpha=0.7)
-    ax.bar(x + width / 2, np.array(class_counts_pred)/len(class_counts_pred), width, label='Predicted', color='green', alpha=0.7)
+    ax.bar(x - width / 2, np.array(class_counts_labels)/sum(class_counts_labels), width, label='Ground Truth', color='blue', alpha=0.7)
+    ax.bar(x + width / 2, np.array(class_counts_pred)/sum(class_counts_pred), width, label='Predicted', color='green', alpha=0.7)
 
     # Set the labels and titles
     ax.set_title('Class Frequency Comparison: Ground Truth vs. Predicted')
