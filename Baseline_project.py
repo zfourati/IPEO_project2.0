@@ -20,6 +20,9 @@ seed = 323444           # the seed value used to initialise the random number ge
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 
+path_to_model = 'cnn_states/HypercolumnBaseline'
+os.makedirs(path_to_model, exist_ok=True)
+
 class GreenlandData(Dataset):
     LABEL_CLASSES = (
     "Bad data",
@@ -270,16 +273,15 @@ def train_epoch(data_loader, model, optimiser, device):
 
 import glob
 
-os.makedirs('cnn_states/Hypercolumn', exist_ok=True)
 
 def load_model(epoch='latest'):
     model = Hypercolumn()
-    modelStates = glob.glob('cnn_states/Hypercolumn/*.pth')
+    modelStates = glob.glob(path_to_model + '/*.pth')
     if len(modelStates) and (epoch == 'latest' or epoch > 0):
-        modelStates = [int(m.replace('cnn_states/Hypercolumn/','').replace('.pth', '')) for m in modelStates]
+        modelStates = [int(m.replace(path_to_model+'/','').replace('.pth', '')) for m in modelStates]
         if epoch == 'latest':
             epoch = max(modelStates)
-        stateDict = torch.load(open(f'cnn_states/Hypercolumn/{epoch}.pth', 'rb'), map_location='cpu')
+        stateDict = torch.load(open(f'{path_to_model}/{epoch}.pth', 'rb'), map_location='cpu')
         model.load_state_dict(stateDict)
     else:
         # fresh model
@@ -342,11 +344,11 @@ def validate_epoch(data_loader, model, device):       # note: no optimiser neede
 
 
 def save_model(model, epoch):
-    torch.save(model.state_dict(), open(f'cnn_states/Hypercolumn/{epoch}.pth', 'wb'))
+    torch.save(model.state_dict(), open(f'{path_to_model}/{epoch}.pth', 'wb'))
     
 # define hyperparameters
 device = 'cuda'
-start_epoch = 'latest'        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 0        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
@@ -400,3 +402,40 @@ dataset_test = GreenlandData(year=2023)
 dl_test = DataLoader(dataset_test, batch_size=batch_size, shuffle=False)
 loss_test, oa_test = validate_epoch(dl_test, model, device)
 print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
+
+#Plot results
+def visualize(dataLoader, epochs = ['latest'], numImages=5):
+    models = [load_model(e)[0] for e in epochs]
+    numModels = len(models)
+    for idx, (data, labels, image_name) in enumerate(dataLoader):
+        if idx == numImages:
+            break
+
+        _, ax = plt.subplots(nrows=1, ncols=numModels+1, figsize = (20, 15))
+
+        # plot ground truth
+        ax[0].imshow(labels[0,...].cpu().numpy())
+        ax[0].axis('off')
+        if idx == 0:
+            ax[0].set_title('Ground Truth')
+
+        for mIdx, model in enumerate(models):
+            model = model.to(device)
+            with torch.no_grad():
+                pred = model(data.to(device))
+
+                # get the label (i.e., the maximum position for each pixel along the class dimension)
+                yhat = torch.argmax(pred, dim=1)
+
+            # plot model predictions
+            ax[mIdx+1].imshow(yhat[0,...].cpu().numpy())
+            ax[mIdx+1].axis('off')
+            if idx == 0:
+                ax[mIdx+1].set_title(f'Epoch {epochs[mIdx]}')
+    plt.save('test_baseline.png')
+
+
+# visualize predictions for a number of epochs
+# load model states at different epochs
+epochs = [0, 1, 5, 'latest']                       
+visualize(dl_test, epochs)
