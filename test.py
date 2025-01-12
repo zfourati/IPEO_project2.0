@@ -8,19 +8,34 @@ import rasterio
 import numpy as np
 import matplotlib.pyplot as plt
 import torch.nn as nn
-
-import os
+from collections import Counter
+from tqdm.notebook import trange
 import random
-import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
-import rasterio
-import torch
-#matplotlib.use('Agg')
-#from glob import glob
+from torch.optim import SGD
+import glob
+from Function_lib import *
 
 print(torch.cuda.is_available())
-LABEL_CLASSES = (
+seed = 323444           # the seed value used to initialise the random number generator of PyTorch
+torch.manual_seed(seed)
+torch.cuda.manual_seed(seed)
+
+path_to_model = 'cnn_states/HypercolumnBaseline'
+os.makedirs(path_to_model, exist_ok=True)
+
+path_to_plot = 'Plots/Baseline'
+os.makedirs(path_to_plot, exist_ok=True)
+
+# define hyperparameters
+device = 'cuda'
+start_epoch = 'latest'        # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+batch_size = 30
+learning_rate = 0.1
+weight_decay = 0.001
+num_epochs = 10
+validation_split_ratio = 0.2
+
+label_names = [
     "Bad data",
     "Snow and Ice",
     "Wet ice and meltwater",
@@ -28,99 +43,99 @@ LABEL_CLASSES = (
     "Sediment",
     "Bedrock",
     "Vegetation",
-    )
-class GreenlandData(Dataset):
-    LABEL_CLASSES = (
-    "Bad data",
-    "Snow and Ice",
-    "Wet ice and meltwater",
-    "Freshwater",
-    "Sediment",
-    "Bedrock",
-    "Vegetation",
-    )
+    ]
 
-    def __init__(self, year=2014, transforms=None):
-        self.transforms = transforms
+class Hypercolumn(nn.Module):
 
-    # prepare data
-        self.data = []  # list of tuples of (image path, label path, name)
-        if year == 2023:
-            files_list = sorted(os.listdir('data/images/test/2023'))
-            for file_name in files_list:
-                imgName = os.path.join('data/images/test/2023/',file_name)
-                labelName = os.path.join('data/labels/test/',file_name)
-                self.data.append((
-                        imgName,
-                        labelName,
-                        file_name
-                    ))
-        else:
-            files_list = sorted(os.listdir(f'data/images/train/{str(year)}'))
-            for file_name in files_list:
-                imgName = os.path.join(f'data/images/train/{str(year)}',file_name)
-                labelName = os.path.join('data/labels/train/',file_name)
-                self.data.append((
-                        imgName,
-                        labelName,
-                        file_name
-                    ))
+    def __init__(self):
+        super(Hypercolumn, self).__init__()
 
-
-    def __len__(self):
-            return len(self.data)
+        #TODO: define your architecture and forward pass here
+        self.block1 = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=5, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=32),
+            nn.ReLU(inplace=True)
+        )
+        self.block2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=5, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(inplace=True)
+        )
+        self.block3 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=5, stride=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=128),
+            nn.ReLU(inplace=True)
+        )
+        self.block4 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, stride=1),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(inplace=True)
+        )
+        self.final = nn.Sequential(
+            nn.Conv2d(483, 256, kernel_size=1, stride=1),           # 3 (input) + 32 + 64 + 128 + 256 = 487
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, 7, kernel_size=1, stride=1)
+        )
 
 
-    def __getitem__(self, x):
-        imgName, labelName, fileName = self.data[x]
-        with rasterio.open(imgName) as src:
-            # Read the RGB bands (3, 2, 1)
-            rgb = np.dstack([src.read(3), src.read(2), src.read(1)])
-            # Normalize RGB for better visualization
-            rgb = rgb.astype(float)
-            if rgb.max() - rgb.min() != 0:
-                #print('min:',rgb.min())
-                #print('max:',rgb.max())
-                #print(fileName)
-                rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
+    def forward(self, x):
+        #TODO
+        upsample = nn.Upsample(size=(x.size(2), x.size(3)))
+        x1 = self.block1(x)
+        x2 = self.block2(x1)
+        x3 = self.block3(x2)
+        x4 = self.block4(x3)
 
-        if self.transforms is not None:
-            rgb = self.transforms(rgb)
+        hypercol = torch.cat(
+            (x, upsample(x1), upsample(x2), upsample(x3), upsample(x4)),
+            dim=1)
+        return self.final(hypercol)
+    
+criterion = nn.CrossEntropyLoss()
 
-        with rasterio.open(labelName) as lbl_src:
-            labels = lbl_src.read(1)  # Read the first band which contains the labels
-        return rgb, labels, fileName
+dl_train = LoadData(batch_size, split='train', num_workers=1)
+dl_val = LoadData(batch_size, split='val', num_workers=1)
 
-from collections import Counter
+# load model
+model, epoch = load_model(Hypercolumn(), path_to_model, epoch=start_epoch)
+optim = setup_optimiser(model, learning_rate, weight_decay)
 
-def plot_label_distribution(dataset):
-    # Initialize a counter for label frequencies
-    label_counter = Counter()
+# do epochs
+while epoch < num_epochs:
 
-    # Iterate over the dataset
-    for _, labels, _ in dataset:
-        unique, counts = np.unique(labels, return_counts=True)
-        label_counter.update(dict(zip(unique, counts)))
+    # training
+    model, loss_train, oa_train = train_epoch(dl_train, model, optim, device)
 
-    # Map label indices to class names
-    class_names = LABEL_CLASSES
-    class_counts = [label_counter.get(i, 0) for i in range(len(class_names))]
-    #print(sum(class_counts))
-    # Plot the distribution
-    plt.figure(figsize=(10, 6))
-    plt.bar(class_names, np.array(class_counts) / sum(class_counts), color='skyblue')
-    plt.xlabel('Label Classes')
-    plt.ylabel('Frequency')
-    plt.title('Label Distribution in Dataset')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig('Label_distrib_TEST')
-    plt.show()
+    # validation
+    loss_val, oa_val = validate_epoch(dl_val, model, device)
 
-# Example usage
-dataset_train_2014 = GreenlandData(year=2014)
-dataset_train_2015 = GreenlandData(year=2015)
-dataset_train_2016 = GreenlandData(year=2016)
-# Combine the datasets
-combined_dataset = torch.utils.data.ConcatDataset([dataset_train_2014, dataset_train_2015,dataset_train_2016])
-plot_label_distribution(combined_dataset)
+    # print stats
+    print('[Ep. {}/{}] Loss train: {:.2f}, val: {:.2f}; OA train: {:.2f}, val: {:.2f}'.format(
+        epoch+1, num_epochs,
+        loss_train, loss_val,
+        100*oa_train, 100*oa_val
+    ))
+
+    # save model
+    epoch += 1
+    save_model(model, epoch, path_to_model)
+    
+    
+#Testing
+dl_test = LoadData(batch_size, split='test', num_workers=1)
+loss_test, oa_test = validate_epoch(dl_test, model, device)
+print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
+
+#Visualize predictions and label class distribution
+dl_test_single = LoadData(batch_size=1, split='test', num_workers=1)                
+visualize(dl_test_single,model, path_to_plot, path_to_model)
+
+dl_train_single = LoadData(batch_size, split='train', num_workers=1)
+dl_val_single = LoadData(batch_size, split='val', num_workers=1)
+plot_label_distribution(dl_train_single, path_to_plot)
+plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')

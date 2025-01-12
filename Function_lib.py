@@ -61,6 +61,16 @@ class GreenlandData(Dataset):
                                 labelName,
                                 file_name.replace(".tif", "")
                             ))
+            elif split == 'val':
+                for file_name in val_list:
+                    for year in ['2014','2015','2016']:
+                        imgName = os.path.join(f'data/images/train/{year}',file_name)
+                        labelName = os.path.join('data/labels/train/',file_name)
+                        self.data.append((
+                                imgName,
+                                labelName,
+                                file_name.replace(".tif", "")
+                            ))
 
 
     def __len__(self):
@@ -324,6 +334,13 @@ def train_epoch(data_loader, model, optimiser, device):
 
     return model, loss_total, oa_total
 
+def setup_optimiser(model, learning_rate, weight_decay):
+    return SGD(
+        model.parameters(),
+        learning_rate,
+        weight_decay
+    )
+
 def load_model(model, path_to_model, epoch='latest'):
     modelStates = glob.glob(path_to_model + '/*.pth')
     if len(modelStates) and (epoch == 'latest' or epoch > 0):
@@ -415,7 +432,7 @@ def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
     plt.savefig(f'{path_to_plot}/Label_distribution_{state}.png')
     plt.show()
     
-def visualize(dataLoader, path_to_plot, device='cuda', epoch = 'latest', numImages=5):
+def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoch = 'latest', numImages=5):
     label_names = [
     "Bad data",
     "Snow and Ice",
@@ -425,7 +442,7 @@ def visualize(dataLoader, path_to_plot, device='cuda', epoch = 'latest', numImag
     "Bedrock",
     "Vegetation",
     ]
-    model, _ = load_model(epoch)
+    model, _ = load_model(model, path_to_model, epoch)
     model = model.to(device)
     label_counter = Counter()
     pred_counter =  Counter()
