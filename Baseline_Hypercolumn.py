@@ -23,12 +23,12 @@ torch.cuda.manual_seed(seed)
 path_to_model = 'cnn_states/HypercolumnBaseline'
 os.makedirs(path_to_model, exist_ok=True)
 
-path_to_plot = 'Plots/Baseline'
+path_to_plot = 'Plots/HypercolumnBaseline'
 os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
