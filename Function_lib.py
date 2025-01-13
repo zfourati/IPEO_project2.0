@@ -13,6 +13,7 @@ from tqdm.notebook import trange
 import random
 from torch.optim import SGD
 import glob
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
 class GreenlandData(Dataset):
@@ -432,6 +433,7 @@ def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
     plt.savefig(f'{path_to_plot}/Label_distribution_{state}.png')
     plt.show()
     
+""" 
 def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoch = 'latest', numImages=5):
     label_names = [
     "Bad data",
@@ -493,3 +495,87 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
     plt.savefig(f'{path_to_plot}/Label_distribution_test.png')
+    
+"""
+
+def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoch = 'latest', numImages=5):
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    label_names = [
+    "Bad data",
+    "Snow and Ice",
+    "Wet ice and meltwater",
+    "Freshwater",
+    "Sediment",
+    "Bedrock",
+    "Vegetation",
+    ]
+    model, _ = load_model(model, path_to_model, epoch)
+    model = model.to(device)
+    label_counter = Counter()
+    pred_counter =  Counter()
+    # Store true and predicted labels for confusion matrix
+    all_true_labels = []
+    all_pred_labels = []
+    for idx, (data, labels, image_name) in enumerate(dataLoader):
+        if idx == numImages:
+            break
+        unique_label, counts_label = np.unique(labels, return_counts=True)
+        label_counter.update(dict(zip(unique_label, counts_label)))
+        
+        _, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
+  
+        labels = labels.to(device)
+        
+        # plot ground truth
+        ax[0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+        ax[0].axis('off')
+        ax[0].set_title('Ground Truth')
+
+        with torch.no_grad():
+            pred = model(data.to(device))
+
+            # get the label (i.e., the maximum position for each pixel along the class dimension)
+            yhat = torch.argmax(pred, dim=1)
+            
+            unique_pred, counts_pred = np.unique(yhat.cpu().numpy(), return_counts=True)
+            pred_counter.update(dict(zip(unique_pred, counts_pred)))
+
+            # Append to confusion matrix lists
+            all_true_labels.extend(labels.cpu().numpy().flatten())
+            all_pred_labels.extend(yhat.cpu().numpy().flatten())
+            
+            # plot model predictions
+            ax[1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+            ax[1].axis('off')
+            ax[1].set_title(image_name[0])
+        plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
+    class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
+    class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
+    fig, ax = plt.subplots(figsize=(20, 8))
+    width = 0.35  # width of the bars
+    x = np.arange(len(label_names))  # the label positions
+
+    # Plot the bars for ground truth (blue) and predicted classes (green)
+    ax.bar(x - width / 2, np.array(class_counts_labels)/sum(class_counts_labels), width, label='Ground Truth', color='blue', alpha=0.7)
+    ax.bar(x + width / 2, np.array(class_counts_pred)/sum(class_counts_pred), width, label='Predicted', color='green', alpha=0.7)
+
+    # Set the labels and titles
+    ax.set_title('Class Frequency Comparison: Ground Truth vs. Predicted')
+    ax.set_xlabel('Class')
+    ax.set_ylabel('Frequency')
+    ax.set_xticks(x)
+    ax.set_xticklabels(label_names, rotation=45)
+    ax.legend()
+    plt.savefig(f'{path_to_plot}/Label_distribution_test.png')
+    
+    #Plot confusion matrix
+    conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)))
+
+    plt.figure(figsize=(10, 8))
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
+    disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+    plt.title('Confusion Matrix')
+    plt.savefig(f'{path_to_plot}/Confusion_Matrix.png')
+    
+
+

@@ -17,6 +17,7 @@ from tqdm.notebook import trange
 import random
 from torch.optim import SGD
 import glob
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from Function_lib import *
 
 print('GPU available: ',torch.cuda.is_available())
