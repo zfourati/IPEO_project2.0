@@ -13,7 +13,7 @@ from tqdm.notebook import trange
 import random
 from torch.optim import SGD
 import glob
-
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 class GreenlandData(Dataset):
     LABEL_CLASSES = (
@@ -180,7 +180,7 @@ class GreenlandData_transforms(Dataset):
 
         rgb = torch.tensor(rgb.transpose(2, 0, 1), dtype=torch.float32)
         labels = torch.tensor(labels, dtype=torch.long)
-        print(f"Unique values in labels: {torch.unique(labels)}")
+        #print(f"Unique values in labels: {torch.unique(labels)}")
 
         return rgb, labels, fileName
 
@@ -237,25 +237,29 @@ def train_epoch(data_loader, model, optimiser, device):
 
     # iterate over dataset
     pBar = trange(len(data_loader))
-    for idx, (data, target, _) in enumerate(data_loader):
+    for idx, (data, target, img_name) in enumerate(data_loader):
 
         # put data and target onto correct device
         data, target = data.to(device), target.to(device)
 
+        #print(f"Number of unique labels: {torch.unique(target)}")
         # reset gradients
         optimiser.zero_grad()
-
         # forward pass
         pred = model(data)
+        #print(f"Model Output Shape: {pred.shape}")
 
         # loss
         loss = criterion(pred, target)
+        #print(img_name)
+
 
         # backward pass
         loss.backward()
 
         # parameter update
         optimiser.step()
+
 
         #print loss
         #print('loss:', loss.item())
@@ -291,11 +295,13 @@ def load_model(model, path_to_model, epoch='latest'):
         modelStates = [int(m.replace(path_to_model+'/','').replace('.pth', '')) for m in modelStates]
         if epoch == 'latest':
             epoch = max(modelStates)
+            print('saved epoch', epoch)
         stateDict = torch.load(open(f'{path_to_model}/{epoch}.pth', 'rb'), map_location='cpu')
         model.load_state_dict(stateDict)
     else:
         # fresh model
         epoch = 0
+        print('begin from start', epoch)
     return model, epoch
 
 def validate_epoch(data_loader, model, device):       # note: no optimiser needed
@@ -377,6 +383,7 @@ def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
     plt.show()
     
 def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoch = 'latest', numImages=5):
+    from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
     label_names = [
     "Bad data",
     "Snow and Ice",
@@ -390,6 +397,9 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     model = model.to(device)
     label_counter = Counter()
     pred_counter =  Counter()
+    # Store true and predicted labels for confusion matrix
+    all_true_labels = []
+    all_pred_labels = []
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
@@ -414,6 +424,10 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             unique_pred, counts_pred = np.unique(yhat.cpu().numpy(), return_counts=True)
             pred_counter.update(dict(zip(unique_pred, counts_pred)))
 
+            # Append to confusion matrix lists
+            all_true_labels.extend(labels.cpu().numpy().flatten())
+            all_pred_labels.extend(yhat.cpu().numpy().flatten())
+            
             # plot model predictions
             ax[1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
             ax[1].axis('off')
@@ -437,3 +451,35 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
     plt.savefig(f'{path_to_plot}/Label_distribution_test.png')
+    
+    # Plot confusion matrix
+    conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)))
+
+    plt.figure(figsize=(10, 8))
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
+    disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+    plt.title('Confusion Matrix')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Confusion_Matrix.png')
+
+    conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)), normalize='true')
+
+    plt.figure(figsize=(10, 8))
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
+    disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+    plt.title('Confusion Matrix')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Confusion_Matrix_true.png')
+
+    conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)), normalize='pred')
+
+    plt.figure(figsize=(10, 8))
+    disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
+    disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+    plt.title('Confusion Matrix')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Confusion_Matrix_pred.png')
+
+
+    
+    

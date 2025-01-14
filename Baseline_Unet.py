@@ -20,6 +20,7 @@ import random
 from torch.optim import SGD
 import glob
 from segmentation_models_pytorch import Unet
+import segmentation_models_pytorch as smp
 from Function_lib_v2 import *
 
 print(torch.cuda.is_available())
@@ -59,25 +60,54 @@ model = Unet(
     classes=7                      # Number of output classes
 )
 
-print(model)
+"""
+batch_size=30
+dataset_train = GreenlandData(split='train')
+dataloader_train = LoadData(batch_size, 'train', num_workers=1) #ReshapeDataLoader(GreenlandData(split='train'), batch_size=batch_size, num_workers=2)
+data, target, img_name = iter(dataloader_train).__next__()
+
+print(np.shape(data))
+
+pred = model(data)
+
+print(f"Model Output Shape: {pred.shape}")
+
+loss = criterion(pred, target)
+print(loss)
+
+# backward pass
+loss.backward()
+
+assert pred.size(1) == len(dataset_train.LABEL_CLASSES), f'ERROR: invalid number of model output channels (should be # classes {len(dataset_train.LABEL_CLASSES)}, got {pred.size(1)})'
+assert pred.size(2) == data.size(2), f'ERROR: invalid spatial height of model output (should be {data.size(2)}, got {pred.size(2)})'
+assert pred.size(3) == data.size(3), f'ERROR: invalid spatial width of model output (should be {data.size(3)}, got {pred.size(3)})'
+"""
+
 
 criterion = nn.CrossEntropyLoss()
+
+#criterion = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+ # for image segmentation dice loss could be the best first choice
+        #self.loss_fn = smp.losses.DiceLoss(smp.losses.BINARY_MODE, from_logits=True)
+
 
 dl_train = LoadData(batch_size, split='train', num_workers=1)
 dl_val = LoadData(batch_size, split='val', num_workers=1)
 
 # load model
-model, epoch = load_model(Unet(), path_to_model, epoch=start_epoch)
+model, epoch = load_model(model, path_to_model, epoch=start_epoch)
 optim = setup_optimiser(model, learning_rate, weight_decay)
+
 
 # do epochs
 while epoch < num_epochs:
+    print(epoch)
 
     # training
-    model, loss_train, oa_train = train_epoch(dl_train, model, optim, device)
+    model, loss_train, oa_train = train_epoch(dl_train, model, optim, device, epoch, train_loss_log)
 
     # validation
-    loss_val, oa_val = validate_epoch(dl_val, model, device)
+    loss_val, oa_val = validate_epoch(dl_val, model, device, epoch, val_loss_log)
 
     # print stats
     print('[Ep. {}/{}] Loss train: {:.2f}, val: {:.2f}; OA train: {:.2f}, val: {:.2f}'.format(
@@ -98,9 +128,10 @@ print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
 #Visualize predictions and label class distribution
 dl_test_single = LoadData(batch_size=1, split='test', num_workers=1)                
-visualize(dl_test_single,model, path_to_plot, path_to_model)
+visualize(dl_test_single, model, path_to_plot, path_to_model)
 
 dl_train_single = LoadData(batch_size, split='train', num_workers=1)
 dl_val_single = LoadData(batch_size, split='val', num_workers=1)
 plot_label_distribution(dl_train_single, path_to_plot)
 plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
+
