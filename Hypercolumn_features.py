@@ -1,5 +1,5 @@
 """
-Add features to data and use on hypercolumn 
+For each image combine the RGB bands of the 3 years and add features to data and use on hypercolumn 
 """
 
 import torch
