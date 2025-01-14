@@ -1,5 +1,5 @@
 """
-Add features to data and use on hypercolumn 
+For each image combine the RGB bands of the 3 years and add features to data and use on hypercolumn 
 """
 
 import torch
@@ -17,6 +17,7 @@ from tqdm.notebook import trange
 import random
 from torch.optim import SGD
 import glob
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from Function_lib import *
 
 print('GPU available: ',torch.cuda.is_available())
