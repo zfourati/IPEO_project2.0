@@ -21,7 +21,7 @@ seed = 323444           # the seed value used to initialise the random number ge
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
 
-path_to_model = 'cnn_states/HypercolumnBaseline'
+path_to_model = 'cnn_states/Baseline'
 os.makedirs(path_to_model, exist_ok=True)
 
 path_to_plot = 'Plots/Baseline'

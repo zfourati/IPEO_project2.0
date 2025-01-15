@@ -14,7 +14,7 @@ import random
 from torch.optim import SGD
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import glob
-from Function_lib import *
+import Function_lib as lib
 
 print('GPU available: ',torch.cuda.is_available())
 seed = 323444           # the seed value used to initialise the random number generator of PyTorch
@@ -45,7 +45,7 @@ label_names = [
     "Bedrock",
     "Vegetation",
     ]
-
+"""
 class Hypercolumn(nn.Module):
 
     def __init__(self):
@@ -96,24 +96,30 @@ class Hypercolumn(nn.Module):
             (x, upsample(x1), upsample(x2), upsample(x3), upsample(x4)),
             dim=1)
         return self.final(hypercol)
-    
+"""
+dataloader_train = DataLoader(lib.GreenlandData(split='train'), batch_size=1, num_workers=1)
+#model = lib.Hypercolumn()
+data, _ , __= iter(dataloader_train).__next__()
+nbr_channels = data.shape[3]
+print(nbr_channels)
+
 criterion = nn.CrossEntropyLoss()
 
-dl_train = LoadData(batch_size, split='train', num_workers=1)
-dl_val = LoadData(batch_size, split='val', num_workers=1)
+dl_train = lib.LoadData(batch_size, split='train', num_workers=1)
+dl_val = lib.LoadData(batch_size, split='val', num_workers=1)
 
 # load model
-model, epoch = load_model(Hypercolumn(), path_to_model, epoch=start_epoch)
-optim = setup_optimiser(model, learning_rate, weight_decay)
+model, epoch = lib.load_model(lib.Hypercolumn(input_channels=nbr_channels), path_to_model, epoch=start_epoch)
+optim = lib.setup_optimiser(model, learning_rate, weight_decay)
 
 # do epochs
 while epoch < num_epochs:
 
     # training
-    model, loss_train, oa_train = train_epoch(dl_train, model, optim, device)
+    model, loss_train, oa_train = lib.train_epoch(dl_train, model, optim, device)
 
     # validation
-    loss_val, oa_val = validate_epoch(dl_val, model, device)
+    loss_val, oa_val = lib.validate_epoch(dl_val, model, device)
 
     # print stats
     print('[Ep. {}/{}] Loss train: {:.2f}, val: {:.2f}; OA train: {:.2f}, val: {:.2f}'.format(
@@ -124,19 +130,19 @@ while epoch < num_epochs:
 
     # save model
     epoch += 1
-    save_model(model, epoch, path_to_model)
+    lib.save_model(model, epoch, path_to_model)
     
     
 #Testing
-dl_test = LoadData(batch_size, split='test', num_workers=1)
-loss_test, oa_test = validate_epoch(dl_test, model, device)
+dl_test = lib.LoadData(batch_size, split='test', num_workers=1)
+loss_test, oa_test = lib.validate_epoch(dl_test, model, device)
 print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
 #Visualize predictions and label class distribution
-dl_test_single = LoadData(batch_size=1, split='test', num_workers=1)                
-visualize(dl_test_single,model, path_to_plot, path_to_model)
+dl_test_single = lib.LoadData(batch_size=1, split='test', num_workers=1)                
+lib.visualize(dl_test_single,model, path_to_plot, path_to_model)
 
-dl_train_single = LoadData(batch_size, split='train', num_workers=1)
-dl_val_single = LoadData(batch_size, split='val', num_workers=1)
-plot_label_distribution(dl_train_single, path_to_plot)
-plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
+dl_train_single = lib.LoadData(batch_size, split='train', num_workers=1)
+dl_val_single = lib.LoadData(batch_size, split='val', num_workers=1)
+lib.plot_label_distribution(dl_train_single, path_to_plot)
+lib.plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')

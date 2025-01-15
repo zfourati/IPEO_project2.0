@@ -114,38 +114,6 @@ class GreenlandData(Dataset):
         return rgb, labels, fileName
 
 
-# Random crop
-def random_crop(image, label, crop_height, crop_width):
-    """
-            Perform a random crop on an image and its corresponding label.
-
-                Args:
-                    image (np.ndarray): The input image (H, W, C) or (H, W) for grayscale.
-                    label (np.ndarray): The corresponding label mask (H, W).
-                    crop_height (int): Desired height of the crop.
-                    crop_width (int): Desired width of the crop.
-
-                Returns:
-                    tuple: Cropped image and label.
-                """
-    # Get dimensions of the image
-    img_height, img_width = image.shape[:2]
-
-                # Ensure the crop size is smaller than the image dimensions
-    if crop_height > img_height or crop_width > img_width:
-        raise ValueError("Crop size must be smaller than the image dimensions.")
-
-                # Randomly select the top and left coordinates
-    top = np.random.randint(0, img_height - crop_height + 1)
-    left = np.random.randint(0, img_width - crop_width + 1)
-
-    # Crop the image
-    cropped_image = image[top:top + crop_height, left:left + crop_width]
-
-    # Crop the label
-    cropped_label = label[top:top + crop_height, left:left + crop_width]
-
-    return cropped_image, cropped_label
             
 
 class GreenlandData_transforms(Dataset):
