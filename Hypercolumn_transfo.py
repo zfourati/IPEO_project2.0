@@ -116,6 +116,12 @@ class GreenlandData(Dataset):
                 if rgb.max() - rgb.min() != 0:
                     rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
 
+                if self.transforms == True:
+                    # Convert to grayscale
+                    if random.random() > 0.5:
+                        gray_scale_intensity = np.dot(rgb, [0.2989, 0.5870, 0.1140]).copy()
+                        rgb = np.dstack([gray_scale_intensity, gray_scale_intensity, gray_scale_intensity])
+
                 # Calculate indices
                 red = src.read(3)  # Band 4: Red
                 nir = src.read(4)  # Band 5: Near Infrared
