@@ -35,7 +35,7 @@ os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
@@ -73,7 +73,6 @@ optim = lib.setup_optimiser(model, learning_rate, weight_decay)
 
 # do epochs
 while epoch < num_epochs:
-    print(epoch)
 
     # training
     model, loss_train, oa_train = lib.train_epoch(dl_train, model, optim, device)#, epoch, train_loss_log)

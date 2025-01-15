@@ -1,7 +1,7 @@
 """
-
+This script processes Greenland imagery to combine the rgb bands, NDVI, NDWI and NDSI values 
+and apply them to a pretrained U-Net to predict landcover classification. 
 """
-
 import torch
 import rasterio
 from torch.utils.data import Dataset
@@ -34,7 +34,7 @@ os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
