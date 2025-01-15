@@ -87,9 +87,6 @@ class GreenlandData(Dataset):
             # Normalize RGB for better visualization
             rgb = rgb.astype(float)
             if rgb.max() - rgb.min() != 0:
-                #print('min:',rgb.min())
-                #print('max:',rgb.max())
-                #print(fileName)
                 rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
 
         with rasterio.open(labelName) as lbl_src:
@@ -255,8 +252,6 @@ class GreenlandData_features(Dataset):
         labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
 
         return bands, labels, fileName
-
-
 
 
 class ReshapeDataLoader:
@@ -568,6 +563,18 @@ def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
         path_to_plot (str): Path to the folder where the plot will be saved
         state (str, optional): State of the dataset used to name the plot. Defaults to 'train'.
     """
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 10
+    BIGGER_SIZE = 12
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     label_names = [
     "Bad data",
     "Snow and Ice",
@@ -620,6 +627,18 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         None
     """
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 10
+    BIGGER_SIZE = 12
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     label_names = [
     "Bad data",
     "Snow and Ice",
