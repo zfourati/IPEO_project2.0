@@ -17,6 +17,23 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 
 class GreenlandData(Dataset):
+    """
+    A custom PyTorch Dataset for Greenland data, including satellite imagery and labels.
+
+    Attributes:
+        LABEL_CLASSES (tuple): A list of class labels for segmentation.
+        data (list): A list of tuples containing the image path, label path, and file name.
+        transforms (callable, optional): Optional transformations to apply to the images.
+    
+    Methods:
+        __init__(split, transforms):
+            Initializes the dataset, preparing data paths based on the split (train, val, or test).
+        __len__():
+            Returns the number of samples in the dataset.
+        __getitem__(x):
+            Retrieves the image, label, and file name for a given index.
+    """
+    
     LABEL_CLASSES = (
     "Bad data",
     "Snow and Ice",
@@ -28,6 +45,7 @@ class GreenlandData(Dataset):
     )
 
     def __init__(self, split='train', transforms=None):
+        
         self.transforms = transforms
 
     # prepare data
@@ -86,9 +104,6 @@ class GreenlandData(Dataset):
             # Normalize RGB for better visualization
             rgb = rgb.astype(float)
             if rgb.max() - rgb.min() != 0:
-                #print('min:',rgb.min())
-                #print('max:',rgb.max())
-                #print(fileName)
                 rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
 
         if self.transforms is not None:
