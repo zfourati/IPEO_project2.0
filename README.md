@@ -1,9 +1,4 @@
-#  Landcovermappingin Greenland with multi-temporal imagery
-## Introduction
-
-
-## Table of content
-
+#  Landcover mapping in Greenland with multi-temporal imagery
 ## Installation
 To set up the Greenland_ipeo_venv environment, use the provided environment.yaml file.
 
