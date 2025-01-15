@@ -170,8 +170,8 @@ class GreenlandData(Dataset):
             # Random rotation (90, 180, 270 degrees)
             if random.random() > 0.5:
                 k = random.choice([1, 2, 3])  # Number of 90-degree rotations
-                bands = np.rot90(bands, k, axes=(0, 1))
-                labels = np.rot90(labels, k, axes=(0, 1))
+                bands = np.rot90(bands, k, axes=(0, 1)).copy()
+                labels = np.rot90(labels, k, axes=(0, 1)).copy()
 
         bands = torch.tensor(bands, dtype=torch.float32).permute(2, 0, 1)  # Channel-first format
         labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
