@@ -286,7 +286,7 @@ class ReshapeDataLoader:
         """
         return len(self.dataloader)
     
-def LoadData(batch_size, split, num_workers):
+def LoadData(batch_size, split, num_workers, transforms = False):
     """
     Creates and returns a reshaped DataLoader for the GreenlandData dataset.
 
@@ -298,7 +298,7 @@ def LoadData(batch_size, split, num_workers):
     Returns:
         DataLoader: A reshaped DataLoader instance for the specified dataset split.
     """
-    return ReshapeDataLoader(DataLoader(GreenlandData(split=split),
+    return ReshapeDataLoader(DataLoader(GreenlandData(transforms=transforms, split=split),
                                         batch_size=batch_size,
                                         shuffle=(split=='train'),
                                         num_workers=num_workers,))
@@ -627,18 +627,6 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         None
     """
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-    SMALL_SIZE = 10
-    MEDIUM_SIZE = 15
-    BIGGER_SIZE = 20
-
-    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-    plt.rc('axes', titlesize=BIGGER_SIZE)     # fontsize of the axes title
-    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
     label_names = [
     "Bad data",
     "Snow and Ice",
@@ -668,6 +656,8 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         unique_label, counts_label = np.unique(labels, return_counts=True)
         label_counter.update(dict(zip(unique_label, counts_label)))
         
+        #_, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
+        
         labels = labels.to(device)
         
         # plot ground truth
@@ -695,11 +685,26 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             ax[idx,1].set_title(f'Prediction: {image_name[0]}')
 
     plt.tight_layout()
+        #plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
     plt.savefig(f'{path_to_plot}/GroundtruthVspred_{file_name}.png')
+
 
     class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
     class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
-    fig, ax = plt.subplots(figsize=(20, 8))
+
+    SMALL_SIZE = 20
+    MEDIUM_SIZE = 25
+    BIGGER_SIZE = 30
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+    fig, ax = plt.subplots(figsize=(15, 6))
     width = 0.35  # width of the bars
     x = np.arange(len(label_names))  # the label positions
 
@@ -721,10 +726,22 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     #Plot confusion matrix
     conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)))
 
+    SMALL_SIZE = 16
+    MEDIUM_SIZE = 20
+    BIGGER_SIZE = 24
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
     plt.figure(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
 
+
     plt.title(f'Confusion Matrix ({file_name})')
     plt.tight_layout()
     plt.savefig(f'{path_to_plot}/Confusion_Matrix_{file_name}.png')
+
