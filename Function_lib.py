@@ -682,10 +682,9 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             # plot model predictions
             ax[idx,1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
             ax[idx,1].axis('off')
-            ax[idx,1].set_title(f'Prediction: {image_name[0]}')
+            ax[idx,1].set_title(f'Prediction: {image_name[0]}', fontsize=16)
 
     plt.tight_layout()
-        #plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
     plt.savefig(f'{path_to_plot}/GroundtruthVspred_{file_name}.png')
 
 

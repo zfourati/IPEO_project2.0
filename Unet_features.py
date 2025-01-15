@@ -1,7 +1,5 @@
 """
-Baseline Project
-We combine the datasets for the 3 years and split them into 80% training data and 20% validation.
-Model used: Hypercolumn
+
 """
 
 import torch
@@ -36,7 +34,7 @@ os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001

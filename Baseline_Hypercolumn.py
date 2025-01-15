@@ -1,3 +1,7 @@
+"""
+This script processes Greenland imagery to combine the rgb bands 
+and apply them to a hypercolumn to predict landcover classification. 
+"""
 import torch
 import rasterio
 from torch.utils.data import Dataset
