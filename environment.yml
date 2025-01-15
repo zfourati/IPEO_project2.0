@@ -1,4 +1,4 @@
-name: ipeo_venv
+name: Greenland_ipeo_venv
 channels:
   - defaults
 dependencies:
