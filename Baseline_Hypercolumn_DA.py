@@ -1,3 +1,7 @@
+"""
+This script processes Greenland imagery to combine the rgb bands, apply data augmentation 
+to the training dataset and apply them to a hypercolumn to predict landcover classification. 
+"""
 import torch
 import rasterio
 from torch.utils.data import Dataset
@@ -29,7 +33,7 @@ os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
@@ -46,16 +50,15 @@ label_names = [
     "Vegetation",
     ]
 
+#Calculate the number of channels
 dataloader_train = DataLoader(lib.GreenlandData(transforms=True, split='train'), batch_size=1, num_workers=1)
-#model = lib.Hypercolumn()
 data, _ , __= iter(dataloader_train).__next__()
 nbr_channels = data.shape[3]
-print(nbr_channels)
 
 criterion = nn.CrossEntropyLoss()
 
-dl_train = lib.LoadData(batch_size, split='train', num_workers=1)
-dl_val = lib.LoadData(batch_size, split='val', num_workers=1)
+dl_train = lib.LoadData(batch_size, split='train', num_workers=1, transforms=True)
+dl_val = lib.LoadData(batch_size, split='val', num_workers=1, transforms=False)
 
 # load model
 model, epoch = lib.load_model(lib.Hypercolumn(input_channels=nbr_channels), path_to_model, epoch=start_epoch)
@@ -91,7 +94,7 @@ print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 dl_test_single = lib.LoadData(batch_size=1, split='test', num_workers=1)                
 lib.visualize(dl_test_single,model, path_to_plot, path_to_model)
 
-dl_train_single = lib.LoadData(batch_size, split='train', num_workers=1)
-dl_val_single = lib.LoadData(batch_size, split='val', num_workers=1)
+dl_train_single = lib.LoadData(batch_size=1, split='train', num_workers=1)
+dl_val_single = lib.LoadData(batch_size=1, split='val', num_workers=1)
 lib.plot_label_distribution(dl_train_single, path_to_plot)
 lib.plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
