@@ -87,6 +87,10 @@ class GreenlandData(Dataset):
 
         with rasterio.open(labelName) as lbl_src:
             labels = lbl_src.read(1)  # Read the first band which contains the labels
+            
+        rgb = torch.tensor(rgb, dtype=torch.float32).permute(2, 0, 1)  # Channel-first format
+        labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
+
         return rgb, labels, fileName
 
 class ReshapeDataLoader:
@@ -210,7 +214,8 @@ class Hypercolumn(nn.Module):
 
 batch_size=3
 dataset_train = GreenlandData(year=2014)
-dataloader_train = ReshapeDataLoader(DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=2))
+#dataloader_train = ReshapeDataLoader(DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=2))
+dataloader_train = DataLoader(GreenlandData(year=2014), batch_size=batch_size, num_workers=2)
 model = Hypercolumn()
 data, _ , __= iter(dataloader_train).__next__()
 
@@ -221,7 +226,7 @@ assert pred.size(1) == len(dataset_train.LABEL_CLASSES), f'ERROR: invalid number
 assert pred.size(2) == data.size(2), f'ERROR: invalid spatial height of model output (should be {data.size(2)}, got {pred.size(2)})'
 assert pred.size(3) == data.size(3), f'ERROR: invalid spatial width of model output (should be {data.size(3)}, got {pred.size(3)})'
 
-
+"""
 criterion = nn.CrossEntropyLoss()
 from torch.optim import SGD
 
@@ -496,3 +501,4 @@ dl_train_single = ReshapeDataLoader(DataLoader(train_dataset, batch_size=1, shuf
 dl_val_single = ReshapeDataLoader(DataLoader(val_dataset, batch_size=1, shuffle=False))
 plot_label_distribution(dl_train_single)
 plot_label_distribution(dl_train_single, state = 'val')
+"""

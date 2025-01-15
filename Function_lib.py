@@ -291,12 +291,110 @@ class ReshapeDataLoader:
         return len(self.dataloader)
     
 def LoadData(batch_size, split, num_workers):
+    """
+    Creates and returns a reshaped DataLoader for the GreenlandData dataset.
+
+    Args:
+        batch_size (int): The number of samples per batch to load.
+        split (str): The dataset split to load ('train', 'val', or 'test').
+        num_workers (int): The number of subprocesses to use for data loading.
+
+    Returns:
+        DataLoader: A reshaped DataLoader instance for the specified dataset split.
+    """
     return ReshapeDataLoader(DataLoader(GreenlandData(split=split),
                                         batch_size=batch_size,
                                         shuffle=(split=='train'),
                                         num_workers=num_workers,))
     
-    
+class Hypercolumn(nn.Module):
+    """
+    A PyTorch module that implements a hypercolumn-based CNN architecture 
+    for semantic segmentation or classification tasks.
+
+    Attributes:
+        block1 (nn.Sequential): First convolutional block with 32 filters.
+        block2 (nn.Sequential): Second convolutional block with 64 filters.
+        block3 (nn.Sequential): Third convolutional block with 128 filters.
+        block4 (nn.Sequential): Fourth convolutional block with 256 filters.
+        final (nn.Sequential): The final classifier block that reduces dimensionality 
+            and outputs predictions for the given number of classes.
+        upsample (nn.Upsample): Module for upsampling feature maps to match input dimensions.
+
+    Methods:
+        forward(x):
+            Defines the forward pass of the network. Combines features from 
+            different convolutional blocks to form a hypercolumn and outputs 
+            predictions for each pixel.
+
+    Args:
+        input_channels (int, optional): Number of input channels in the image (default: 12).
+        num_classes (int, optional): Number of output classes for classification (default: 7).
+    """
+    def __init__(self, input_channels=12, num_classes=7):
+        super(Hypercolumn, self).__init__()
+
+        # Initial convolutional blocks
+        self.block1 = nn.Sequential(
+            nn.Conv2d(input_channels, 32, kernel_size=5, stride=2, padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=32),
+            nn.ReLU(inplace=True)
+        )
+        self.block2 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=64),
+            nn.ReLU(inplace=True)
+        )
+        self.block3 = nn.Sequential(
+            nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=128),
+            nn.ReLU(inplace=True)
+        )
+        self.block4 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.MaxPool2d(kernel_size=2, stride=1),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(inplace=True)
+        )
+
+        # Final classifier
+        self.final = nn.Sequential(
+            nn.Conv2d(input_channels + 32 + 64 + 128 + 256, 256, kernel_size=1, stride=1),
+            nn.BatchNorm2d(num_features=256),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(256, num_classes, kernel_size=1, stride=1)
+        )
+
+        # Upsampling module
+        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+
+    def forward(self, x):
+        """
+        Forward pass for the Hypercolumn model.
+
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, input_channels, height, width).
+
+        Returns:
+            torch.Tensor: Output tensor of shape (batch_size, num_classes, height, width), 
+                          where each pixel contains class probabilities or logits.
+        """
+        upsample = nn.Upsample(size=(x.size(2), x.size(3)))
+        x1 = self.block1(x)
+        x2 = self.block2(x1)
+        x3 = self.block3(x2)
+        x4 = self.block4(x3)
+
+        hypercol = torch.cat(
+            (x, upsample(x1), upsample(x2), upsample(x3), upsample(x4)),
+            dim=1
+        )
+        return self.final(hypercol)
+
+
 criterion = nn.CrossEntropyLoss()
 def train_epoch(data_loader, model, optimiser, device):
     """Train the model for 1 epoch

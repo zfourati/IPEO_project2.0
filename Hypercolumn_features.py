@@ -18,7 +18,8 @@ import random
 from torch.optim import SGD
 import glob
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-from Function_lib import *
+#from Function_lib import *
+import Function_lib as lib
 
 print('GPU available: ',torch.cuda.is_available())
 seed = 323444           # the seed value used to initialise the random number generator of PyTorch
@@ -50,7 +51,7 @@ label_names = [
     "Vegetation",
     ]
 
-class GreenlandData(Dataset):
+class GreenlandData_Features(Dataset):
     LABEL_CLASSES = (
         "Bad data",
         "Snow and Ice",
@@ -102,10 +103,10 @@ class GreenlandData(Dataset):
         imgPaths, labelName, fileName = self.data[x]
 
         # Read and process temporal images (for 2014, 2015, 2016 or 2023 for test)
-        temporal_bands = []
-        temporal_ndvi = []
-        temporal_ndwi = []
-        temporal_ndsi = []
+        temporal_bands = [] #List of RGB bands for (2014, 2015 and 2016) or 2023 for test
+        temporal_ndvi = []  #List of NDVI values for (2014, 2015 and 2016) or 2023 for test
+        temporal_ndwi = []  #List of NDWI values for (2014, 2015 and 2016) or 2023 for test
+        temporal_ndsi = []  #List of NDSI values for (2014, 2015 and 2016) or 2023 for test
 
         for imgPath in imgPaths:
             with rasterio.open(imgPath) as src:
@@ -137,14 +138,14 @@ class GreenlandData(Dataset):
         temporal_ndsi = np.stack(temporal_ndsi, axis=0)
 
         # Temporal statistics
-        rgb_mean = np.mean(temporal_bands, axis=0)
-        rgb_std = np.std(temporal_bands, axis=0)
-        ndvi_mean = np.mean(temporal_ndvi, axis=0)
-        ndvi_std = np.std(temporal_ndvi, axis=0)
-        ndwi_mean = np.mean(temporal_ndwi, axis=0)
-        ndwi_std = np.std(temporal_ndwi, axis=0)
-        ndsi_mean = np.mean(temporal_ndsi, axis=0)
-        ndsi_std = np.std(temporal_ndsi, axis=0)
+        rgb_mean = np.mean(temporal_bands, axis=0)  #Mean RGB bands across (2014, 2015 and 2016) or 2023 for test
+        rgb_std = np.std(temporal_bands, axis=0)    #Standard deviation of RGB bands across (2014, 2015 and 2016) or 2023 for test
+        ndvi_mean = np.mean(temporal_ndvi, axis=0)  #Mean NDVI values across (2014, 2015 and 2016) or 2023 for test
+        ndvi_std = np.std(temporal_ndvi, axis=0)    #Standard deviation of NDVI values across (2014, 2015 and 2016) or 2023 for test
+        ndwi_mean = np.mean(temporal_ndwi, axis=0)  #Mean NDWI values across (2014, 2015 and 2016) or 2023 for test
+        ndwi_std = np.std(temporal_ndwi, axis=0)    #Standard deviation of NDWI values across (2014, 2015 and 2016) or 2023 for test
+        ndsi_mean = np.mean(temporal_ndsi, axis=0)  #Mean NDSI values across (2014, 2015 and 2016) or 2023 for test
+        ndsi_std = np.std(temporal_ndsi, axis=0)    #Standard deviation of NDSI values across (2014, 2015 and 2016) or 2023 for test
 
         # Combine features into a hypercolumn
         bands = np.dstack([
@@ -159,94 +160,24 @@ class GreenlandData(Dataset):
         labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
 
         return bands, labels, fileName
-
-
-class Hypercolumn(nn.Module):
-    def __init__(self, input_channels=12, num_classes=7):
-        super(Hypercolumn, self).__init__()
-
-        # Initial convolutional blocks
-        self.block1 = nn.Sequential(
-            nn.Conv2d(input_channels, 32, kernel_size=5, stride=2, padding=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=32),
-            nn.ReLU(inplace=True)
-        )
-        self.block2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=5, stride=2, padding=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=64),
-            nn.ReLU(inplace=True)
-        )
-        self.block3 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=5, stride=2, padding=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=128),
-            nn.ReLU(inplace=True)
-        )
-        self.block4 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=256),
-            nn.ReLU(inplace=True)
-        )
-
-        # Final classifier
-        self.final = nn.Sequential(
-            nn.Conv2d(input_channels + 32 + 64 + 128 + 256, 256, kernel_size=1, stride=1),
-            nn.BatchNorm2d(num_features=256),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, num_classes, kernel_size=1, stride=1)
-        )
-
-        # Upsampling module
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
-
-    def forward(self, x):
-        upsample = nn.Upsample(size=(x.size(2), x.size(3)))
-        x1 = self.block1(x)
-        x2 = self.block2(x1)
-        x3 = self.block3(x2)
-        x4 = self.block4(x3)
-
-        hypercol = torch.cat(
-            (x, upsample(x1), upsample(x2), upsample(x3), upsample(x4)),
-            dim=1
-        )
-        return self.final(hypercol)
-"""
-batch_size=3
-dataset_train = GreenlandData(split='train')
-dataloader_train = DataLoader(GreenlandData(split='train'), batch_size=batch_size, num_workers=2)
-model = Hypercolumn()
-data, _ , __= iter(dataloader_train).__next__()
-
-pred = model(data)
-
-
-assert pred.size(1) == len(dataset_train.LABEL_CLASSES), f'ERROR: invalid number of model output channels (should be # classes {len(dataset_train.LABEL_CLASSES)}, got {pred.size(1)})'
-assert pred.size(2) == data.size(2), f'ERROR: invalid spatial height of model output (should be {data.size(2)}, got {pred.size(2)})'
-assert pred.size(3) == data.size(3), f'ERROR: invalid spatial width of model output (should be {data.size(3)}, got {pred.size(3)})'
-
-"""
     
 criterion = nn.CrossEntropyLoss()
 
-dl_train = DataLoader(GreenlandData(split='train'), batch_size=batch_size, num_workers=1)
-dl_val = DataLoader(GreenlandData(split='val'), batch_size=batch_size, num_workers=1)
+dl_train = DataLoader(GreenlandData_Features(split='train'), batch_size=batch_size, num_workers=1)
+dl_val = DataLoader(GreenlandData_Features(split='val'), batch_size=batch_size, num_workers=1)
 
 # load model
-model, epoch = load_model(Hypercolumn(), path_to_model, epoch=start_epoch)
-optim = setup_optimiser(model, learning_rate, weight_decay)
+model, epoch = lib.load_model(lib.Hypercolumn(input_channels=12), path_to_model, epoch=start_epoch)
+optim = lib.setup_optimiser(model, learning_rate, weight_decay)
 
 # do epochs
 while epoch < num_epochs:
 
     # training
-    model, loss_train, oa_train = train_epoch(dl_train, model, optim, device)
+    model, loss_train, oa_train = lib.train_epoch(dl_train, model, optim, device)
 
     # validation
-    loss_val, oa_val = validate_epoch(dl_val, model, device)
+    loss_val, oa_val = lib.validate_epoch(dl_val, model, device)
 
     # print stats
     print('[Ep. {}/{}] Loss train: {:.2f}, val: {:.2f}; OA train: {:.2f}, val: {:.2f}'.format(
@@ -257,19 +188,21 @@ while epoch < num_epochs:
 
     # save model
     epoch += 1
-    save_model(model, epoch, path_to_model)
+    lib.save_model(model, epoch, path_to_model)
     
     
 #Testing
-dl_test = DataLoader(GreenlandData(split='test'),batch_size= batch_size, num_workers=1)
-loss_test, oa_test = validate_epoch(dl_test, model, device)
+dl_test = DataLoader(GreenlandData_Features(split='test'),batch_size= batch_size, num_workers=1)
+loss_test, oa_test = lib.validate_epoch(dl_test, model, device)
 print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
 #Visualize predictions and label class distribution
-dl_test_single = DataLoader(GreenlandData(split='test'),batch_size= 1, num_workers=1)         
-visualize(dl_test_single,model, path_to_plot, path_to_model)
+dl_test_single = DataLoader(GreenlandData_Features(split='test'),batch_size= 1, num_workers=1)         
+lib.visualize(dl_test_single,model, path_to_plot, path_to_model)
 
-dl_train_single = DataLoader(GreenlandData(split='train'),batch_size= batch_size, num_workers=1)
-dl_val_single = DataLoader(GreenlandData(split='val'),batch_size= batch_size, num_workers=1)
-plot_label_distribution(dl_train_single, path_to_plot)
-plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
+"""
+dl_train_single = DataLoader(GreenlandData_Features(split='train'),batch_size= batch_size, num_workers=1)
+dl_val_single = DataLoader(GreenlandData_Features(split='val'),batch_size= batch_size, num_workers=1)
+lib.plot_label_distribution(dl_train_single, path_to_plot)
+lib.plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
+"""
