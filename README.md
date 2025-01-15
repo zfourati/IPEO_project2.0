@@ -1,6 +1,6 @@
 #  Landcover mapping in Greenland with multi-temporal imagery
 ## Installation
-To set up the Greenland_ipeo_venv environment, use the provided environment.yaml file.
+To set up the Greenland_ipeo_venv environment, use the provided `environment.yaml` file.
 
 ## Project structure
 - `Baseline_Hypercolumn.py` : Script to process Greenland imagery to combine the RGB bands and apply them to a hypercolumn in order to predict landcover classification.
@@ -39,6 +39,3 @@ For each experiment run the corresponding python file in order to:
 
 ## Data
 The dataset used for training can be downloaded from [[link-to-dataset](https://enacshare.epfl.ch/bY2wS5TcA4CefGks7NtXg)]. Unzip the folder and place the labels/ and images/ folders in the data/ folder.
-## Model
-
-## Evaluation
