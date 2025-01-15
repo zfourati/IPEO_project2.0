@@ -159,13 +159,13 @@ class GreenlandData(Dataset):
         if self.transforms == True:
             # Random horizontal flip
             if random.random() > 0.5:
-                bands = np.flip(bands, axis=1)
-                labels = np.flip(labels, axis=1)
+                bands = np.flip(bands, axis=1).copy()
+                labels = np.flip(labels, axis=1).copy()
             
             # Random vertical flip
             if random.random() > 0.5:
-                bands = np.flip(bands, axis=0)
-                labels = np.flip(labels, axis=0)
+                bands = np.flip(bands, axis=0).copy()
+                labels = np.flip(labels, axis=0).copy()
 
             # Random rotation (90, 180, 270 degrees)
             if random.random() > 0.5:
