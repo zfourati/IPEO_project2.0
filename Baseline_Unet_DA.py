@@ -1,7 +1,6 @@
 """
-Baseline Project
-We combine the datasets for the 3 years and split them into 80% training data and 20% validation.
-Model used: Hypercolumn
+This script processes Greenland imagery to combine the rgb bands and apply data augmentation
+and apply them to a pretrained U-Net to predict landcover classification. 
 """
 
 import torch

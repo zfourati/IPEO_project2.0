@@ -2,7 +2,7 @@
 This script processes Greenland imagery to combine temporal statistics for landcover classification. 
 It computes features such as NDVI, NDWI, and NDSI, along with their mean and standard deviation over multiple years 
 (2014, 2015, 2016 for training/validation and 2023 for testing). These temporal features are integrated into 
-a hypercolumn representation for deep learning-based classification using PyTorch. 
+a hypercolumn representation to predict landcover classification. 
 """
 import torch
 import rasterio

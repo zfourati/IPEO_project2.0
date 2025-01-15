@@ -254,6 +254,90 @@ class GreenlandData_features(Dataset):
         return bands, labels, fileName
 
 
+class GreenlandData_Unet_features(Dataset):
+    LABEL_CLASSES = (
+    "Bad data",
+    "Snow and Ice",
+    "Wet ice and meltwater",
+    "Freshwater",
+    "Sediment",
+    "Bedrock",
+    "Vegetation",
+    )
+
+    def __init__(self, split='train', transforms=None):
+        self.transforms = transforms
+
+    # prepare data
+        self.data = []  # list of tuples of (image path, label path, name)
+        if split == 'test':
+            files_list = sorted(os.listdir('data/images/test/2023'))
+            for file_name in files_list:
+                imgName = os.path.join('data/images/test/2023/',file_name)
+                labelName = os.path.join('data/labels/test/',file_name)
+                self.data.append((
+                        imgName,
+                        labelName,
+                        file_name.replace(".tif", "")
+                    ))
+        else:
+            seed = 323444 
+            random.seed(seed)
+            all_image_name = os.listdir('data/images/train/2014')
+            random.shuffle(all_image_name)
+            validation_split_ratio = 0.2
+            validation_size = int(validation_split_ratio * len(all_image_name))
+            # Split the list
+            val_list = all_image_name[:validation_size]
+            train_list = all_image_name[validation_size:]
+            if split == 'train':
+                for file_name in train_list:
+                    for year in ['2014','2015','2016']:
+                        imgName = os.path.join(f'data/images/train/{year}',file_name)
+                        labelName = os.path.join('data/labels/train/',file_name)
+                        self.data.append((
+                                imgName,
+                                labelName,
+                                file_name.replace(".tif", "")
+                            ))
+            elif split == 'val':
+                for file_name in val_list:
+                    for year in ['2014','2015','2016']:
+                        imgName = os.path.join(f'data/images/train/{year}',file_name)
+                        labelName = os.path.join('data/labels/train/',file_name)
+                        self.data.append((
+                                imgName,
+                                labelName,
+                                file_name.replace(".tif", "")
+                            ))
+
+
+    def __len__(self):
+            return len(self.data)
+
+
+    def __getitem__(self, x):
+        imgName, labelName, fileName = self.data[x]
+        with rasterio.open(imgName) as src:
+             # Calculate indices
+                red = src.read(3)  # Band 4: Red
+                nir = src.read(4)  # Band 5: Near Infrared
+                green = src.read(2)  # Band 3: Green
+                swir1 = src.read(5)  # Band 6: Shortwave Infrared 1
+
+                ndvi = (nir - red) / (nir + red + 1e-6)
+                ndwi = (green - nir) / (green + nir + 1e-6)
+                ndsi = (green - swir1) / (green + swir1 + 1e-6)
+
+                bands = np.dstack([ndvi, ndwi, ndsi])
+
+        if self.transforms is not None:
+            bands = self.transforms(bands)
+
+        with rasterio.open(labelName) as lbl_src:
+            labels = lbl_src.read(1)  # Read the first band which contains the labels
+        return bands, labels, fileName
+
 class ReshapeDataLoader:
     def __init__(self, dataloader):
         """
@@ -557,7 +641,7 @@ def save_model(model, epoch, path_to_model):
     
 def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
     """ 
-    Generate a bar plot of the class distrinution in the dataset and saves it.
+    Generate a bar plot of the class distribution in the dataset and saves it.
     Args:
         dataset (DataLoader): The DataLoader instance that provides batches of size 1 of the data.
         path_to_plot (str): Path to the folder where the plot will be saved

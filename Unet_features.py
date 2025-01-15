@@ -58,7 +58,7 @@ model = Unet(
     classes=7                      # Number of output classes
 )
 
-class GreenlandData(Dataset):
+class GreenlandData_Unet_features(Dataset):
     LABEL_CLASSES = (
     "Bad data",
     "Snow and Ice",
@@ -144,13 +144,13 @@ class GreenlandData(Dataset):
 
 
 criterion = nn.CrossEntropyLoss()
-lib.ReshapeDataLoader(DataLoader(GreenlandData(split='train'),
+lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='train'),
                                         batch_size=batch_size,
                                         shuffle='True',
                                         num_workers=1))
 
-dl_train = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='train'), batch_size=batch_size, shuffle='True', num_workers=1))
-dl_val = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='val'), batch_size=batch_size, shuffle='False', num_workers=1))
+dl_train = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='train'), batch_size=batch_size, shuffle='True', num_workers=1))
+dl_val = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='val'), batch_size=batch_size, shuffle='False', num_workers=1))
 
 # load model
 model, epoch = lib.load_model(model, path_to_model, epoch=start_epoch)
@@ -180,16 +180,16 @@ while epoch < num_epochs:
     
     
 #Testing
-dl_test = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='test'), batch_size=batch_size, shuffle='False', num_workers=1))
+dl_test = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='test'), batch_size=batch_size, shuffle='False', num_workers=1))
 loss_test, oa_test = lib.validate_epoch(dl_test, model, device)
 print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 
 #Visualize predictions and label class distribution
-dl_test_single = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='test'), batch_size=1, shuffle='False', num_workers=1))          
+dl_test_single = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='test'), batch_size=1, shuffle='False', num_workers=1))          
 lib.visualize(dl_test_single, model, path_to_plot, path_to_model)
 
-dl_train_single = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='train'), batch_size=1, shuffle='False', num_workers=1))
-dl_val_single = lib.ReshapeDataLoader(DataLoader(GreenlandData(split='train'), batch_size=1, shuffle='False', num_workers=1))
+dl_train_single = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='train'), batch_size=1, shuffle='False', num_workers=1))
+dl_val_single = lib.ReshapeDataLoader(DataLoader(GreenlandData_Unet_features(split='train'), batch_size=1, shuffle='False', num_workers=1))
 lib.plot_label_distribution(dl_train_single, path_to_plot)
 lib.plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
 
