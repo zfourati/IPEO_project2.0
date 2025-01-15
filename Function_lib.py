@@ -286,7 +286,7 @@ class ReshapeDataLoader:
         """
         return len(self.dataloader)
     
-def LoadData(batch_size, split, num_workers):
+def LoadData(batch_size, split, num_workers, transforms = False):
     """
     Creates and returns a reshaped DataLoader for the GreenlandData dataset.
 
@@ -298,7 +298,7 @@ def LoadData(batch_size, split, num_workers):
     Returns:
         DataLoader: A reshaped DataLoader instance for the specified dataset split.
     """
-    return ReshapeDataLoader(DataLoader(GreenlandData(split=split),
+    return ReshapeDataLoader(DataLoader(GreenlandData(transforms=transforms, split=split),
                                         batch_size=batch_size,
                                         shuffle=(split=='train'),
                                         num_workers=num_workers,))
