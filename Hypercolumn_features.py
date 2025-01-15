@@ -1,7 +1,9 @@
 """
-For each image combine the RGB bands of the 3 years and add features to data and use on hypercolumn 
+This script processes Greenland imagery to combine temporal statistics for landcover classification. 
+It computes features such as NDVI, NDWI, and NDSI, along with their mean and standard deviation over multiple years 
+(2014, 2015, 2016 for training/validation and 2023 for testing). These temporal features are integrated into 
+a hypercolumn representation for deep learning-based classification using PyTorch. 
 """
-
 import torch
 import rasterio
 from torch.utils.data import Dataset
@@ -18,7 +20,6 @@ import random
 from torch.optim import SGD
 import glob
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-#from Function_lib import *
 import Function_lib as lib
 
 print('GPU available: ',torch.cuda.is_available())
@@ -52,6 +53,18 @@ label_names = [
     ]
 
 class GreenlandData_Features(Dataset):
+    """
+    PyTorch Dataset for loading Greenland imagery and labels with temporal features.
+
+    Attributes:
+        LABEL_CLASSES (tuple): Class labels for the dataset.
+
+    Methods:
+        __init__(split): Initializes the dataset based on the specified split ('train', 'val', 'test').
+        __len__(): Returns the number of samples in the dataset.
+        __getitem__(x): Retrieves the features, labels, and filename for a given index.
+    """
+    
     LABEL_CLASSES = (
         "Bad data",
         "Snow and Ice",
@@ -63,6 +76,12 @@ class GreenlandData_Features(Dataset):
     )
 
     def __init__(self, split='train'):
+        """
+        Initializes the dataset and prepares data paths based on the split.
+
+        Args:
+            split (str): The dataset split ('train', 'val', or 'test').
+        """
         # Prepare data
         self.data = []  # List of tuples of (image paths for years, label path, name)
         if split == 'test':
@@ -97,9 +116,24 @@ class GreenlandData_Features(Dataset):
                     self.data.append((imgPaths, labelName, file_name.replace(".tif", "")))
 
     def __len__(self):
+        """
+        Returns the number of samples in the dataset.
+
+        Returns:
+            int: Number of samples.
+        """
         return len(self.data)
 
     def __getitem__(self, x):
+        """
+        Retrieves the features, labels, and filename for a given index.
+
+        Args:
+            x (int): Index of the sample.
+
+        Returns:
+            tuple: Features (torch.Tensor), labels (torch.Tensor), and filename (str).
+        """
         imgPaths, labelName, fileName = self.data[x]
 
         # Read and process temporal images (for 2014, 2015, 2016 or 2023 for test)
@@ -163,6 +197,7 @@ class GreenlandData_Features(Dataset):
     
 criterion = nn.CrossEntropyLoss()
 
+#Load training and validation data
 dl_train = DataLoader(GreenlandData_Features(split='train'), batch_size=batch_size, num_workers=1)
 dl_val = DataLoader(GreenlandData_Features(split='val'), batch_size=batch_size, num_workers=1)
 
@@ -200,9 +235,7 @@ print('Testing:  Loss: {:.2f}  OA: {:.2f}'.format(loss_test, 100*oa_test))
 dl_test_single = DataLoader(GreenlandData_Features(split='test'),batch_size= 1, num_workers=1)         
 lib.visualize(dl_test_single,model, path_to_plot, path_to_model)
 
-"""
 dl_train_single = DataLoader(GreenlandData_Features(split='train'),batch_size= batch_size, num_workers=1)
 dl_val_single = DataLoader(GreenlandData_Features(split='val'),batch_size= batch_size, num_workers=1)
 lib.plot_label_distribution(dl_train_single, path_to_plot)
 lib.plot_label_distribution(dl_train_single,path_to_plot,  state = 'val')
-"""
