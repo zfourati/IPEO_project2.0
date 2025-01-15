@@ -14,26 +14,10 @@ import random
 from torch.optim import SGD
 import glob
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from scipy.ndimage import gaussian_filter
 
 
 class GreenlandData(Dataset):
-    """
-    A custom PyTorch Dataset for Greenland data, including satellite imagery and labels.
-
-    Attributes:
-        LABEL_CLASSES (tuple): A list of class labels for segmentation.
-        data (list): A list of tuples containing the image path, label path, and file name.
-        transforms (callable, optional): Optional transformations to apply to the images.
-    
-    Methods:
-        __init__(split, transforms):
-            Initializes the dataset, preparing data paths based on the split (train, val, or test).
-        __len__():
-            Returns the number of samples in the dataset.
-        __getitem__(x):
-            Retrieves the image, label, and file name for a given index.
-    """
-    
     LABEL_CLASSES = (
     "Bad data",
     "Snow and Ice",
@@ -44,8 +28,7 @@ class GreenlandData(Dataset):
     "Vegetation",
     )
 
-    def __init__(self, split='train', transforms=None):
-        
+    def __init__(self, transforms=False, split='train'):
         self.transforms = transforms
 
     # prepare data
@@ -104,46 +87,69 @@ class GreenlandData(Dataset):
             # Normalize RGB for better visualization
             rgb = rgb.astype(float)
             if rgb.max() - rgb.min() != 0:
+                #print('min:',rgb.min())
+                #print('max:',rgb.max())
+                #print(fileName)
                 rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
-
-        if self.transforms is not None:
-            rgb = self.transforms(rgb)
 
         with rasterio.open(labelName) as lbl_src:
             labels = lbl_src.read(1)  # Read the first band which contains the labels
+
+        if self.transforms == True:
+            # Random horizontal flip
+            if random.random() > 0.5:
+                rgb = np.flip(rgb, axis=1).copy()
+                labels = np.flip(labels, axis=1).copy()
+            
+            # Random vertical flip
+            if random.random() > 0.5:
+                rgb = np.flip(rgb, axis=0).copy()
+                labels = np.flip(labels, axis=0).copy()
+
+            # Random rotation (90, 180, 270 degrees)
+            if random.random() > 0.5:
+                k = random.choice([1, 2, 3])  # Number of 90-degree rotations
+                rgb = np.rot90(rgb, k, axes=(0, 1)).copy()
+                labels = np.rot90(labels, k, axes=(0, 1)).copy()
+            
+            # Gaussian Blur
+            if random.random() > 0.5:
+                sigma = random.uniform(0.1, 2.0)  # Randomly choose a sigma value for the blur
+                rgb = gaussian_filter(rgb, sigma=(sigma, sigma, 0))  # Apply Gaussian blur
+            
+            rgb = torch.tensor(rgb, dtype=torch.float32) # Channel-first format
+            labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
+
         return rgb, labels, fileName
-
-
             
 
-class GreenlandData_transforms(Dataset):
+class GreenlandData_features(Dataset):
     LABEL_CLASSES = (
-    "Bad data",
-    "Snow and Ice",
-    "Wet ice and meltwater",
-    "Freshwater",
-    "Sediment",
-    "Bedrock",
-    "Vegetation",
+        "Bad data",
+        "Snow and Ice",
+        "Wet ice and meltwater",
+        "Freshwater",
+        "Sediment",
+        "Bedrock",
+        "Vegetation",
     )
 
-    def __init__(self, split='train'):
-
-        # prepare data
-        self.split = split
-        self.data = []  # list of tuples of (image path, label path, name)
-        if self.split == 'test':
+    def __init__(self, transforms = False, split='train'):
+        self.transforms = transforms
+        # Prepare data
+        self.data = []  # List of tuples of (image paths for years, label path, name)
+        if split == 'test':
             files_list = sorted(os.listdir('data/images/test/2023'))
             for file_name in files_list:
-                imgName = os.path.join('data/images/test/2023/',file_name)
-                labelName = os.path.join('data/labels/test/',file_name)
+                imgName = os.path.join('data/images/test/2023/', file_name)
+                labelName = os.path.join('data/labels/test/', file_name)
                 self.data.append((
-                        imgName,
-                        labelName,
-                        file_name.replace(".tif", "")
-                    ))
+                    [imgName],  # Only 2023 image for test
+                    labelName,
+                    file_name.replace(".tif", "")
+                ))
         else:
-            seed = 323444 
+            seed = 323444
             random.seed(seed)
             all_image_name = os.listdir('data/images/train/2014')
             random.shuffle(all_image_name)
@@ -152,77 +158,104 @@ class GreenlandData_transforms(Dataset):
             # Split the list
             val_list = all_image_name[:validation_size]
             train_list = all_image_name[validation_size:]
-            if self.split == 'train':
+            if split == 'train':
                 for file_name in train_list:
-                    for year in ['2014','2015','2016']:
-                        imgName = os.path.join(f'data/images/train/{year}',file_name)
-                        labelName = os.path.join('data/labels/train/',file_name)
-                        self.data.append((
-                                imgName,
-                                labelName,
-                                file_name.replace(".tif", "")
-                            ))
-
+                    imgPaths = [os.path.join(f'data/images/train/{year}', file_name) for year in ['2014', '2015', '2016']]
+                    labelName = os.path.join('data/labels/train/', file_name)
+                    self.data.append((imgPaths, labelName, file_name.replace(".tif", "")))
+            elif split == 'val':
+                for file_name in val_list:
+                    imgPaths = [os.path.join(f'data/images/train/{year}', file_name) for year in ['2014', '2015', '2016']]
+                    labelName = os.path.join('data/labels/train/', file_name)
+                    self.data.append((imgPaths, labelName, file_name.replace(".tif", "")))
 
     def __len__(self):
-            return len(self.data)
-
+        return len(self.data)
 
     def __getitem__(self, x):
-        imgName, labelName, fileName = self.data[x]
-        with rasterio.open(imgName) as src:
-            bands = np.dstack([src.read(3), src.read(2), src.read(1)])
-            
-            # Normalize each band for better visualization (optional, depending on usage)
-            bands = bands.astype(float)
-            for i in range(bands.shape[-1]):
-                band = bands[..., i]
-                if band.max() - band.min() != 0:
-                    bands[..., i] = (band - band.min()) / (band.max() - band.min())
-            
-            # Calculate NDVI (Normalized Difference Vegetation Index)
-            red = src.read(3)  # Band 4: Red
-            nir = src.read(4)  # Band 5: Near Infrared
-            ndvi = (nir - red) / (nir + red + 1e-6)  # Avoid division by zero
-            
-            # Calculate NDWI (Normalized Difference Water Index)
-            green = src.read(2)  # Band 3: Green
-            ndwi = (green - nir) / (green + nir + 1e-6)
-            
-            # Calculate NDSI (Normalized Difference Snow Index)
-            swir1 = src.read(5)  # Band 6: Shortwave Infrared 1
-            ndsi = (green - swir1) / (green + swir1 + 1e-6)
-            
-            # Stack the additional indices with the original bands
-            all_bands = np.dstack([bands, ndvi, ndwi, ndsi])
-        
+        imgPaths, labelName, fileName = self.data[x]
+
+        # Read and process temporal images (for 2014, 2015, 2016 or 2023 for test)
+        temporal_bands = []
+        temporal_ndvi = []
+        temporal_ndwi = []
+        temporal_ndsi = []
+
+        for imgPath in imgPaths:
+            with rasterio.open(imgPath) as src:
+                # Read RGB and other bands
+                rgb = np.dstack([src.read(3), src.read(2), src.read(1)])
+                rgb = rgb.astype(float)
+                if rgb.max() - rgb.min() != 0:
+                    rgb = (rgb - rgb.min()) / (rgb.max() - rgb.min())
+
+                # Calculate indices
+                red = src.read(3)  # Band 4: Red
+                nir = src.read(4)  # Band 5: Near Infrared
+                green = src.read(2)  # Band 3: Green
+                swir1 = src.read(5)  # Band 6: Shortwave Infrared 1
+
+                ndvi = (nir - red) / (nir + red + 1e-6)
+                ndwi = (green - nir) / (green + nir + 1e-6)
+                ndsi = (green - swir1) / (green + swir1 + 1e-6)
+
+                temporal_bands.append(rgb)
+                temporal_ndvi.append(ndvi)
+                temporal_ndwi.append(ndwi)
+                temporal_ndsi.append(ndsi)
+
+        # Compute temporal features
+        temporal_bands = np.stack(temporal_bands, axis=0)  # [Years, Height, Width, Channels]
+        temporal_ndvi = np.stack(temporal_ndvi, axis=0)  # [Years, Height, Width]
+        temporal_ndwi = np.stack(temporal_ndwi, axis=0)
+        temporal_ndsi = np.stack(temporal_ndsi, axis=0)
+
+        # Temporal statistics
+        rgb_mean = np.mean(temporal_bands, axis=0)
+        rgb_std = np.std(temporal_bands, axis=0)
+        ndvi_mean = np.mean(temporal_ndvi, axis=0)
+        ndvi_std = np.std(temporal_ndvi, axis=0)
+        ndwi_mean = np.mean(temporal_ndwi, axis=0)
+        ndwi_std = np.std(temporal_ndwi, axis=0)
+        ndsi_mean = np.mean(temporal_ndsi, axis=0)
+        ndsi_std = np.std(temporal_ndsi, axis=0)
+
+        # Combine features into a hypercolumn
+        bands = np.dstack([
+            rgb_mean, rgb_std, ndvi_mean, ndvi_std, ndwi_mean, ndwi_std, ndsi_mean, ndsi_std
+        ])  # [Height, Width, Channels]
+
+        # Read labels
         with rasterio.open(labelName) as lbl_src:
             labels = lbl_src.read(1)  # Read the first band which contains the labels
-        
-        if self.split == 'train':
+            
+        if self.transforms == True:
             # Random horizontal flip
             if random.random() > 0.5:
-                all_bands = np.flip(all_bands, axis=1)
-                labels = np.flip(labels, axis=1)
+                bands = np.flip(bands, axis=1).copy()
+                labels = np.flip(labels, axis=1).copy()
             
             # Random vertical flip
             if random.random() > 0.5:
-                all_bands = np.flip(all_bands, axis=0)
-                labels = np.flip(labels, axis=0)
+                bands = np.flip(bands, axis=0).copy()
+                labels = np.flip(labels, axis=0).copy()
 
             # Random rotation (90, 180, 270 degrees)
             if random.random() > 0.5:
                 k = random.choice([1, 2, 3])  # Number of 90-degree rotations
-                all_bands = np.rot90(all_bands, k, axes=(0, 1))
-                labels = np.rot90(labels, k, axes=(0, 1))
-                
-            #if random.random() > 0.5:
-             #   crop_width = np.random.randint(50, 110)
-              #  crop_height = crop_width
-               # all_bands, labels = random_crop(all_bands, labels, 20, 70)
+                bands = np.rot90(bands, k, axes=(0, 1)).copy()
+                labels = np.rot90(labels, k, axes=(0, 1)).copy()
+            
+            # Gaussian Blur
+            if random.random() > 0.5:
+                sigma = random.uniform(0.1, 2.0)  # Randomly choose a sigma value for the blur
+                bands = gaussian_filter(bands, sigma=(sigma, sigma, 0))  # Apply Gaussian blur
 
-        
-        return all_bands, labels, fileName
+        bands = torch.tensor(bands, dtype=torch.float32).permute(2, 0, 1)  # Channel-first format
+        labels = torch.tensor(labels, dtype=torch.long)  # Classification labels
+
+        return bands, labels, fileName
+
 
 
 
