@@ -596,6 +596,9 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     "Bedrock",
     "Vegetation",
     ]
+    
+    file_name = path_to_plot.split('/', 1)[1] 
+
     model, _ = load_model(model, path_to_model, epoch)
     model = model.to(device)
     label_counter = Counter()
@@ -603,20 +606,23 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     # Store true and predicted labels for confusion matrix
     all_true_labels = []
     all_pred_labels = []
+    
+    _, ax = plt.subplots(nrows=numImages, ncols=2,figsize = (20, 15))
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
         unique_label, counts_label = np.unique(labels, return_counts=True)
         label_counter.update(dict(zip(unique_label, counts_label)))
         
-        _, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
-  
+        #_, ax = plt.subplots(nrows=1, ncols=2, figsize = (20, 15))
+        
         labels = labels.to(device)
         
         # plot ground truth
-        ax[0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
-        ax[0].axis('off')
-        ax[0].set_title('Ground Truth')
+        ax[idx,0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+        ax[idx,0].axis('off')
+        ax[idx,0].set_title(f'Ground Truth: {image_name[0]}')
+        
 
         with torch.no_grad():
             pred = model(data.to(device))
@@ -632,10 +638,12 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             all_pred_labels.extend(yhat.cpu().numpy().flatten())
             
             # plot model predictions
-            ax[1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
-            ax[1].axis('off')
-            ax[1].set_title(image_name[0])
-        plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
+            ax[idx,1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
+            ax[idx,1].axis('off')
+            ax[idx,1].set_title(f'Prediction: {image_name[0]}')
+    plt.tight_layout()
+        #plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
+    plt.savefig(f'{path_to_plot}/GroundtruthVspred_{file_name}.png')
     class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
     class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
     fig, ax = plt.subplots(figsize=(20, 8))
@@ -647,13 +655,14 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     ax.bar(x + width / 2, np.array(class_counts_pred)/sum(class_counts_pred), width, label='Predicted', color='green', alpha=0.7)
 
     # Set the labels and titles
-    ax.set_title('Class Frequency Comparison: Ground Truth vs. Predicted')
+    ax.set_title(f'Class Frequency Comparison: Ground Truth vs. Predicted ({file_name}) ')
     ax.set_xlabel('Class')
     ax.set_ylabel('Frequency')
     ax.set_xticks(x)
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
-    plt.savefig(f'{path_to_plot}/Label_distribution_test.png')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Label_distribution_test_{file_name}.png')
     
     #Plot confusion matrix
     conf_matrix = confusion_matrix(all_true_labels, all_pred_labels, labels=np.arange(len(label_names)))
@@ -661,8 +670,9 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     plt.figure(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
-    plt.title('Confusion Matrix')
-    plt.savefig(f'{path_to_plot}/Confusion_Matrix.png')
+    plt.title(f'Confusion Matrix ({file_name})')
+    plt.tight_layout()
+    plt.savefig(f'{path_to_plot}/Confusion_Matrix_{file_name}.png')
     
 
 

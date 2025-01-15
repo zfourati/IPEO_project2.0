@@ -29,7 +29,7 @@ os.makedirs(path_to_plot, exist_ok=True)
 
 # define hyperparameters
 device = 'cuda'
-start_epoch = 0 # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
+start_epoch = 'latest' # set to 0 to start from scratch again or to 'latest' to continue training from saved checkpoint
 batch_size = 30
 learning_rate = 0.1
 weight_decay = 0.001
@@ -45,66 +45,15 @@ label_names = [
     "Bedrock",
     "Vegetation",
     ]
-"""
-class Hypercolumn(nn.Module):
 
-    def __init__(self):
-        super(Hypercolumn, self).__init__()
-
-        #TODO: define your architecture and forward pass here
-        self.block1 = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=5, stride=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=32),
-            nn.ReLU(inplace=True)
-        )
-        self.block2 = nn.Sequential(
-            nn.Conv2d(32, 64, kernel_size=5, stride=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=64),
-            nn.ReLU(inplace=True)
-        )
-        self.block3 = nn.Sequential(
-            nn.Conv2d(64, 128, kernel_size=5, stride=2),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=128),
-            nn.ReLU(inplace=True)
-        )
-        self.block4 = nn.Sequential(
-            nn.Conv2d(128, 256, kernel_size=3, stride=1),
-            nn.MaxPool2d(kernel_size=2, stride=1),
-            nn.BatchNorm2d(num_features=256),
-            nn.ReLU(inplace=True)
-        )
-        self.final = nn.Sequential(
-            nn.Conv2d(483, 256, kernel_size=1, stride=1),           # 3 (input) + 32 + 64 + 128 + 256 = 487
-            nn.BatchNorm2d(num_features=256),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 7, kernel_size=1, stride=1)
-        )
-
-
-    def forward(self, x):
-        #TODO
-        upsample = nn.Upsample(size=(x.size(2), x.size(3)))
-        x1 = self.block1(x)
-        x2 = self.block2(x1)
-        x3 = self.block3(x2)
-        x4 = self.block4(x3)
-
-        hypercol = torch.cat(
-            (x, upsample(x1), upsample(x2), upsample(x3), upsample(x4)),
-            dim=1)
-        return self.final(hypercol)
-"""
+#Find the number of channels:
 dataloader_train = DataLoader(lib.GreenlandData(split='train'), batch_size=1, num_workers=1)
-#model = lib.Hypercolumn()
 data, _ , __= iter(dataloader_train).__next__()
 nbr_channels = data.shape[3]
-print(nbr_channels)
 
 criterion = nn.CrossEntropyLoss()
 
+#Load training and validation data
 dl_train = lib.LoadData(batch_size, split='train', num_workers=1)
 dl_val = lib.LoadData(batch_size, split='val', num_workers=1)
 
