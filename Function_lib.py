@@ -487,126 +487,6 @@ def load_model(model, path_to_model, epoch='latest'):
         epoch = 0
     return model, epoch
 
-def validate_epoch(data_loader, model, device):  
-    """
-    Validate the model for the training epoch on the validation dataset
-
-    Args:
-        data_loader (DataLoader): The DataLoader instance that provides batches of validation data.
-        model (torch.nn.Module): The model to be validated.
-        device (torch.device): The device (CPU or GPU) on which the computation is performed.
-
-    Returns:
-        loss_total (float): The total validation loss accumulated over all batches
-        oa_total (float): The overall accuracy of the model calculated over the validation dataset.
-    """
-
-    # set model to evaluation mode
-    model.train(False)
-    model.to(device)
-
-    # stats
-    loss_total = 0.0
-    oa_total = 0.0
-
-    # iterate over dataset
-    pBar = trange(len(data_loader))
-    for idx, (data, target, _) in enumerate(data_loader):
-        with torch.no_grad():
-            # put data and target onto correct device
-            data, target = data.to(device), target.to(device)
-
-            # forward pass
-            pred = model(data)
-
-            # loss
-            loss = criterion(pred, target)
-
-            # stats update
-            loss_total += loss.item()
-            oa_total += torch.mean((pred.argmax(1) == target).float()).item()
-
-            # format progress bar
-            pBar.set_description('Loss: {:.2f}, OA: {:.2f}'.format(
-                loss_total/(idx+1),
-                100 * oa_total/(idx+1)
-            ))
-            pBar.update(1)
-
-    pBar.close()
-
-    # normalize stats
-    loss_total /= len(data_loader)
-    oa_total /= len(data_loader)
-
-    return loss_total, oa_total
-
-def save_model(model, epoch, path_to_model):
-    """
-    Save the model's state dictionary to a file.
-
-    Args:
-        model (torch.nn.Module): The model instance whose parameters are to be saved.
-        epoch (int): The training epoch to label the saved model file.
-        path_to_model (str): The directory path where the model file will be saved.
-
-    Returns:
-        None
-    """
-    torch.save(model.state_dict(), open(f'{path_to_model}/{epoch}.pth', 'wb'))
-    
-def plot_label_distribution(dataset, path_to_plot,  state = 'train'):
-    """ 
-    Generate a bar plot of the class distrinution in the dataset and saves it.
-    Args:
-        dataset (DataLoader): The DataLoader instance that provides batches of size 1 of the data.
-        path_to_plot (str): Path to the folder where the plot will be saved
-        state (str, optional): State of the dataset used to name the plot. Defaults to 'train'.
-    """
-    SMALL_SIZE = 8
-    MEDIUM_SIZE = 10
-    BIGGER_SIZE = 12
-
-    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
-    label_names = [
-    "Bad data",
-    "Snow and Ice",
-    "Wet ice and meltwater",
-    "Freshwater",
-    "Sediment",
-    "Bedrock",
-    "Vegetation",
-    ]
-    # Initialize a counter for label frequencies
-    label_counter = Counter()
-
-    # Iterate over the dataset
-    for _, labels, _ in dataset:
-        unique, counts = np.unique(labels, return_counts=True)
-        label_counter.update(dict(zip(unique, counts)))
-
-    # Map label indices to class names
-    class_names = label_names
-    class_counts = [label_counter.get(i, 0) for i in range(len(class_names))]
-    
-    # Plot the distribution
-    plt.figure(figsize=(10, 6))
-    plt.bar(class_names, np.array(class_counts) / sum(class_counts), color='blue')
-    plt.xlabel('Label Classes')
-    plt.ylabel('Frequency')
-    plt.title(f'Label Distribution in {state} Dataset')
-    plt.xticks(rotation=45, ha='right')
-    plt.tight_layout()
-    plt.savefig(f'{path_to_plot}/Label_distribution_{state}.png')
-    plt.show()
-
 def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoch = 'latest', numImages=5):
     """
     Generates and saves the following plots:
@@ -627,18 +507,6 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         None
     """
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
-    SMALL_SIZE = 8
-    MEDIUM_SIZE = 10
-    BIGGER_SIZE = 12
-
-    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-
     label_names = [
     "Bad data",
     "Snow and Ice",
@@ -658,8 +526,10 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     # Store true and predicted labels for confusion matrix
     all_true_labels = []
     all_pred_labels = []
+
     
     _, ax = plt.subplots(nrows=numImages, ncols=2,figsize = (20, 15))
+
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
@@ -674,7 +544,7 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         ax[idx,0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
         ax[idx,0].axis('off')
         ax[idx,0].set_title(f'Ground Truth: {image_name[0]}')
-        
+
 
         with torch.no_grad():
             pred = model(data.to(device))
@@ -693,9 +563,11 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             ax[idx,1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
             ax[idx,1].axis('off')
             ax[idx,1].set_title(f'Prediction: {image_name[0]}')
+
     plt.tight_layout()
         #plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
     plt.savefig(f'{path_to_plot}/GroundtruthVspred_{file_name}.png')
+
     class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
     class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
     fig, ax = plt.subplots(figsize=(20, 8))
@@ -713,6 +585,18 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     ax.set_xticks(x)
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 10
+    BIGGER_SIZE = 12
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     plt.tight_layout()
     plt.savefig(f'{path_to_plot}/Label_distribution_test_{file_name}.png')
     
@@ -722,9 +606,15 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     plt.figure(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     plt.title(f'Confusion Matrix ({file_name})')
     plt.tight_layout()
     plt.savefig(f'{path_to_plot}/Confusion_Matrix_{file_name}.png')
-    
-
-
