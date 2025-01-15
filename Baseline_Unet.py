@@ -23,7 +23,7 @@ from segmentation_models_pytorch import Unet
 import segmentation_models_pytorch as smp
 import Function_lib as lib
 
-print(torch.cuda.is_available())
+print('GPU available: ',torch.cuda.is_available())
 seed = 323444           # the seed value used to initialise the random number generator of PyTorch
 torch.manual_seed(seed)
 torch.cuda.manual_seed(seed)
