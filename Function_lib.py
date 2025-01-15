@@ -658,8 +658,10 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     # Store true and predicted labels for confusion matrix
     all_true_labels = []
     all_pred_labels = []
+
     
     _, ax = plt.subplots(nrows=numImages, ncols=2,figsize = (20, 15))
+
     for idx, (data, labels, image_name) in enumerate(dataLoader):
         if idx == numImages:
             break
@@ -674,7 +676,7 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
         ax[idx,0].imshow(labels.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
         ax[idx,0].axis('off')
         ax[idx,0].set_title(f'Ground Truth: {image_name[0]}')
-        
+
 
         with torch.no_grad():
             pred = model(data.to(device))
@@ -693,9 +695,11 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
             ax[idx,1].imshow(yhat.squeeze(0).cpu().numpy(), cmap='tab20', vmin=0, vmax=len(label_names) - 1)
             ax[idx,1].axis('off')
             ax[idx,1].set_title(f'Prediction: {image_name[0]}')
+
     plt.tight_layout()
         #plt.savefig(f'{path_to_plot}/{image_name[0]}.png')
     plt.savefig(f'{path_to_plot}/GroundtruthVspred_{file_name}.png')
+
     class_counts_labels = [label_counter.get(i, 0) for i in range(len(label_names))]
     class_counts_pred = [pred_counter.get(i, 0) for i in range(len(label_names))]
     fig, ax = plt.subplots(figsize=(20, 8))
@@ -713,6 +717,18 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     ax.set_xticks(x)
     ax.set_xticklabels(label_names, rotation=45)
     ax.legend()
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 10
+    BIGGER_SIZE = 12
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     plt.tight_layout()
     plt.savefig(f'{path_to_plot}/Label_distribution_test_{file_name}.png')
     
@@ -722,9 +738,15 @@ def visualize(dataLoader,model, path_to_plot, path_to_model, device='cuda', epoc
     plt.figure(figsize=(10, 8))
     disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=label_names)
     disp.plot(cmap=plt.cm.Blues, xticks_rotation=45, ax=plt.gca())
+
+    plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
     plt.title(f'Confusion Matrix ({file_name})')
     plt.tight_layout()
     plt.savefig(f'{path_to_plot}/Confusion_Matrix_{file_name}.png')
-    
-
-
